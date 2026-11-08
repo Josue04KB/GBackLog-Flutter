@@ -425,7 +425,7 @@ class _SessionsScreenState extends State<SessionsScreen> {
                   child: Row(
                     children: [
                       Icon(Icons.delete_outline, color: Colors.redAccent, size: 20),
-                      const SizedBox(width: 10),
+                      SizedBox(width: 10),
                       Text(
                         'Eliminar de la biblioteca',
                         style: TextStyle(
