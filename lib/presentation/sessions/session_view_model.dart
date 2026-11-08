@@ -51,7 +51,6 @@ class SessionViewModel extends ChangeNotifier {
     notifyListeners();
 
     try {
-      // Ejecuta validaciones de dominio en el Caso de Uso y guarda en Supabase
       await _registrarSesionUseCase.execute(
         videojuegoId: videojuegoId,
         plataformaId: plataformaId,
@@ -59,7 +58,6 @@ class SessionViewModel extends ChangeNotifier {
         notas: notas,
       );
       _isSubmitting = false;
-      // Vuelve a consultar al servidor remoto para comprobar que aparece
       await cargarSesiones(videojuegoId: filtroVideojuegoIdActual);
       return true;
     } catch (e) {

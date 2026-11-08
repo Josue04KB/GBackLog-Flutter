@@ -69,67 +69,6 @@ class _CatalogScreenState extends State<CatalogScreen> {
     return 'https://images.unsplash.com/photo-1550745165-9bc0b252726f?w=600&q=80';
   }
 
-  // Diálogo de confirmación para eliminar juego
-  Future<void> _mostrarDialogoConfirmarBorrarJuego(
-    Videojuego juego,
-    CatalogViewModel vm,
-    bool isDark,
-  ) async {
-    final nombreJuego = juego.titulo;
-
-    await showDialog<void>(
-      context: context,
-      builder: (dialogCtx) {
-        return AlertDialog(
-          backgroundColor: isDark ? const Color(0xFF1A1826) : Colors.white,
-          title: Row(
-            children: [
-              const Icon(Icons.warning_amber_rounded, color: Colors.redAccent, size: 28),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Text(
-                  '¿Eliminar juego?',
-                  style: TextStyle(
-                    color: isDark ? Colors.white : Colors.black87,
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ),
-            ],
-          ),
-          content: Text(
-            '¿Estás seguro de que deseas eliminar "$nombreJuego" de tu colección? Esta acción también borrará sus sesiones registradas y no se puede deshacer.',
-            style: TextStyle(color: isDark ? Colors.white70 : Colors.black54),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(dialogCtx).pop(),
-              child: const Text('Cancelar'),
-            ),
-            ElevatedButton(
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.red.shade800,
-                foregroundColor: Colors.white,
-              ),
-              onPressed: () async {
-                Navigator.of(dialogCtx).pop();
-                await vm.borrarVideojuego(juego.id);
-                if (!mounted) return;
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text('"$nombreJuego" fue eliminado de tu colección'),
-                  ),
-                );
-              },
-              child: const Text('Sí, eliminar'),
-            ),
-          ],
-        );
-      },
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     final catalogVm = context.watch<CatalogViewModel>();
@@ -138,7 +77,7 @@ class _CatalogScreenState extends State<CatalogScreen> {
     final bgColor = isDark ? const Color(0xFF0D0C14) : Colors.grey.shade100;
     final textColor = isDark ? Colors.white : Colors.black87;
     final subtextColor = isDark ? const Color(0xFF9E9EAB) : Colors.grey.shade600;
-    final totalJuegos = catalogVm.videojuegos.length.toString();
+    final totalJuegos = catalogVm.videojuegos.length;
 
     return Scaffold(
       backgroundColor: bgColor,
@@ -190,7 +129,7 @@ class _CatalogScreenState extends State<CatalogScreen> {
               ),
             ),
 
-            // --- Subtítulo con contador corregido ---
+            // --- Subtítulo ---
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 20),
               child: Text(
@@ -344,7 +283,7 @@ class _CatalogScreenState extends State<CatalogScreen> {
               ),
               itemCount: lista.length,
               itemBuilder: (context, index) {
-                return _buildGameCard(lista[index], vm, isDark);
+                return _buildGameCard(lista[index], isDark);
               },
             );
           },
@@ -352,7 +291,7 @@ class _CatalogScreenState extends State<CatalogScreen> {
     }
   }
 
-  Widget _buildGameCard(Videojuego juego, CatalogViewModel vm, bool isDark) {
+  Widget _buildGameCard(Videojuego juego, bool isDark) {
     final imageUrl = (juego.imagenUrl != null && juego.imagenUrl!.isNotEmpty)
         ? juego.imagenUrl!
         : _portadaPorDefecto(juego.titulo);
@@ -361,14 +300,16 @@ class _CatalogScreenState extends State<CatalogScreen> {
     return GestureDetector(
       onTap: () {
         final encodedTitle = Uri.encodeComponent(juego.titulo);
-        final idJuego = juego.id.toString();
+        final idJuego = juego.id;
         context.push('/sesiones?juegoId=$idJuego&titulo=$encodedTitle');
       },
       child: Container(
         decoration: BoxDecoration(
           color: isDark ? const Color(0xFF181624) : Colors.white,
           borderRadius: BorderRadius.circular(18),
-          boxShadow: isDark ? [] : [const BoxShadow(color: Colors.black12, blurRadius: 4, offset: Offset(0, 2))],
+          boxShadow: isDark
+              ? []
+              : [const BoxShadow(color: Colors.black12, blurRadius: 4, offset: Offset(0, 2))],
         ),
         padding: const EdgeInsets.all(10),
         child: Column(
@@ -430,6 +371,7 @@ class _CatalogScreenState extends State<CatalogScreen> {
               ),
             ),
             const SizedBox(height: 6),
+            // Fila inferior solo con el estado (sin botón de papelera)
             Row(
               children: [
                 Container(
@@ -450,18 +392,6 @@ class _CatalogScreenState extends State<CatalogScreen> {
                       color: statusColor,
                       fontSize: 13,
                       fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                ),
-                InkWell(
-                  onTap: () => _mostrarDialogoConfirmarBorrarJuego(juego, vm, isDark),
-                  borderRadius: BorderRadius.circular(8),
-                  child: Padding(
-                    padding: const EdgeInsets.all(4),
-                    child: Icon(
-                      Icons.delete,
-                      color: isDark ? const Color(0xFF9E9EAB) : Colors.grey,
-                      size: 18,
                     ),
                   ),
                 ),
