@@ -11,6 +11,7 @@ class CatalogViewModel extends ChangeNotifier {
   ViewState _state = ViewState.loading;
   String? _errorMessage;
   bool _isSubmitting = false;
+  String _filtroEstado = 'Todos';
 
   List<Plataforma> _plataformas = [];
   List<Videojuego> _videojuegos = [];
@@ -18,10 +19,20 @@ class CatalogViewModel extends ChangeNotifier {
   ViewState get state => _state;
   String? get errorMessage => _errorMessage;
   bool get isSubmitting => _isSubmitting;
+  String get filtroEstado => _filtroEstado;
   List<Plataforma> get plataformas => _plataformas;
   List<Videojuego> get videojuegos => _videojuegos;
 
-  // Consulta ambas entidades maestras directamente de la nube (Sin caché offline)
+  List<Videojuego> get videojuegosFiltrados {
+    if (_filtroEstado == 'Todos') return _videojuegos;
+    return _videojuegos.where((j) => j.estado == _filtroEstado).toList();
+  }
+
+  void cambiarFiltro(String nuevoFiltro) {
+    _filtroEstado = nuevoFiltro;
+    notifyListeners();
+  }
+
   Future<void> cargarMaestros() async {
     _state = ViewState.loading;
     _errorMessage = null;
@@ -36,7 +47,7 @@ class CatalogViewModel extends ChangeNotifier {
       _plataformas = results[0] as List<Plataforma>;
       _videojuegos = results[1] as List<Videojuego>;
 
-      if (_plataformas.isEmpty && _videojuegos.isEmpty) {
+      if (_videojuegos.isEmpty) {
         _state = ViewState.empty;
       } else {
         _state = ViewState.success;
@@ -52,6 +63,8 @@ class CatalogViewModel extends ChangeNotifier {
     required String titulo,
     required String genero,
     required String estado,
+    required String plataforma,
+    String? imagenUrl,
   }) async {
     _isSubmitting = true;
     _errorMessage = null;
@@ -62,12 +75,26 @@ class CatalogViewModel extends ChangeNotifier {
         titulo: titulo,
         genero: genero,
         estado: estado,
+        plataforma: plataforma,
+        imagenUrl: imagenUrl,
       );
       _isSubmitting = false;
-      await cargarMaestros(); // Recarga desde Supabase para verificar en vivo
+      await cargarMaestros();
       return true;
     } catch (e) {
       _isSubmitting = false;
+      _errorMessage = e.toString().replaceFirst('Exception: ', '');
+      notifyListeners();
+      return false;
+    }
+  }
+
+  Future<bool> borrarVideojuego(int id) async {
+    try {
+      await _repository.eliminarVideojuego(id);
+      await cargarMaestros();
+      return true;
+    } catch (e) {
       _errorMessage = e.toString().replaceFirst('Exception: ', '');
       notifyListeners();
       return false;

@@ -45,12 +45,23 @@ class GameRepositoryImpl implements GameRepository {
     required String titulo,
     required String genero,
     required String estado,
+    required String plataforma,
+    String? imagenUrl,
   }) async {
     await _remoteService.insertVideojuego({
       'titulo': titulo.trim(),
       'genero': genero.trim(),
       'estado': estado,
+      'plataforma': plataforma,
+      'imagen_url': (imagenUrl != null && imagenUrl.trim().isNotEmpty)
+          ? imagenUrl.trim()
+          : null,
     });
+  }
+
+  @override
+  Future<void> eliminarVideojuego(int id) async {
+    await _remoteService.deleteVideojuego(id);
   }
 
   @override

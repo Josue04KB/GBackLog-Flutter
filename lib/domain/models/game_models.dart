@@ -1,4 +1,3 @@
-// 1. ENTIDAD MAESTRA 1: PLATAFORMA
 class Plataforma {
   final int id;
   final String nombre;
@@ -22,18 +21,21 @@ class Plataforma {
   }
 }
 
-// 2. ENTIDAD MAESTRA 2: VIDEOJUEGO
 class Videojuego {
   final int id;
   final String titulo;
   final String genero;
   final String estado;
+  final String plataforma;
+  final String? imagenUrl;
 
   Videojuego({
     required this.id,
     required this.titulo,
     required this.genero,
     required this.estado,
+    required this.plataforma,
+    this.imagenUrl,
   });
 
   factory Videojuego.fromJson(Map<String, dynamic> json) {
@@ -42,12 +44,12 @@ class Videojuego {
       titulo: json['titulo'] as String,
       genero: json['genero'] as String,
       estado: json['estado'] as String,
+      plataforma: (json['plataforma'] as String?) ?? 'PC',
+      imagenUrl: json['imagen_url'] as String?,
     );
   }
 }
 
-// 3. ENTIDAD TRANSACCIONAL: SESIÓN DE JUEGO
-// Relacionada con ambas entidades maestras (Videojuego y Plataforma)
 class SesionJuego {
   final int id;
   final int videojuegoId;
@@ -55,7 +57,6 @@ class SesionJuego {
   final int minutosJugados;
   final String notas;
   final DateTime fecha;
-  // Campos extraídos del JOIN relacional en Supabase para mostrar en la UI
   final String? videojuegoTitulo;
   final String? plataformaNombre;
 

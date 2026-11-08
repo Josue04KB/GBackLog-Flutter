@@ -10,7 +10,6 @@ class SupabaseRemoteService {
   SupabaseRemoteService({SupabaseClient? client})
       : _client = client ?? Supabase.instance.client;
 
-  // --- Gestión de Sesión y JWT ---
   Session? get currentSession => _client.auth.currentSession;
   User? get currentUser => _client.auth.currentUser;
 
@@ -46,7 +45,6 @@ class SupabaseRemoteService {
     }
   }
 
-  // --- Consultas a Entidad Maestra 1: Plataformas ---
   Future<JsonList> fetchPlataformas() async {
     try {
       final response = await _client
@@ -61,7 +59,6 @@ class SupabaseRemoteService {
     }
   }
 
-  // --- Consultas y Creación en Entidad Maestra 2: Videojuegos ---
   Future<JsonList> fetchVideojuegos() async {
     try {
       final response = await _client
@@ -86,7 +83,16 @@ class SupabaseRemoteService {
     }
   }
 
-  // --- Consultas y Registro en Entidad Transaccional: Sesiones de Juego ---
+  Future<void> deleteVideojuego(int id) async {
+    try {
+      await _client.from('videojuegos').delete().eq('id', id);
+    } on SocketException {
+      throw Exception('Sin conexión. No se pudo eliminar el videojuego.');
+    } catch (e) {
+      throw Exception('Error al eliminar videojuego: $e');
+    }
+  }
+
   Future<JsonList> fetchSesiones({int? videojuegoId}) async {
     try {
       var query = _client
