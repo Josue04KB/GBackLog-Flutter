@@ -26,4 +26,9 @@ abstract class GameRepository {
     required int minutosJugados,
     required String notas,
   });
+
+  Future<void> crearPlataforma({required String nombre, required String fabricante, required String formato});
+  Future<void> eliminarPlataforma(int id);
+  Future<void> actualizarContrasena(String nuevaContrasena);
+  Future<void> eliminarCuentaUsuario();
 }

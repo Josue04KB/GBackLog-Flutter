@@ -1,3 +1,4 @@
+import 'package:gamebacklog_cloud/presentation/settings/settings_screen.dart';
 import 'package:go_router/go_router.dart';
 import '../../presentation/auth/auth_screen.dart';
 import '../../presentation/auth/auth_view_model.dart';
@@ -8,7 +9,7 @@ class AppRouter {
   static GoRouter createRouter(AuthViewModel authViewModel) {
     return GoRouter(
       initialLocation: '/catalogo',
-      // Escucha cambios en AuthViewModel (login/logout) en tiempo real
+      // IMPORTANTE: Solo escucha la autenticación para proteger las rutas privadas
       refreshListenable: authViewModel,
       redirect: (context, state) {
         final isLoggedIn = authViewModel.isAuthenticated;
@@ -37,6 +38,10 @@ class AppRouter {
         GoRoute(
           path: '/catalogo',
           builder: (context, state) => const CatalogScreen(),
+        ),
+        GoRoute(
+          path: '/config', 
+          builder: (context, state) => const SettingsScreen(),
         ),
         GoRoute(
           path: '/sesiones',

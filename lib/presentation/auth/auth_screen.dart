@@ -6,158 +6,240 @@ import 'auth_view_model.dart';
 class AuthScreen extends StatefulWidget {
   final bool isRegister;
 
-  const AuthScreen({super.key, this.isRegister = false});
+  const AuthScreen({super.key, required this.isRegister});
 
   @override
   State<AuthScreen> createState() => _AuthScreenState();
 }
 
 class _AuthScreenState extends State<AuthScreen> {
-  final _emailCtrl = TextEditingController();
-  final _passCtrl = TextEditingController();
+  final _emailController = TextEditingController();
+  final _passwordController = TextEditingController();
 
   @override
   void dispose() {
-    _emailCtrl.dispose();
-    _passCtrl.dispose();
+    _emailController.dispose();
+    _passwordController.dispose();
     super.dispose();
-  }
-
-  Future<void> _submit() async {
-    final email = _emailCtrl.text.trim();
-    final pass = _passCtrl.text.trim();
-
-    if (email.isEmpty || !email.contains('@')) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Ingresa un correo electrónico válido.')),
-      );
-      return;
-    }
-    if (pass.length < 6) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('La contraseña debe tener mínimo 6 caracteres.')),
-      );
-      return;
-    }
-
-    final vm = context.read<AuthViewModel>();
-    final ok = widget.isRegister
-        ? await vm.signUp(email, pass)
-        : await vm.signIn(email, pass);
-
-    if (!mounted) return;
-    if (ok) {
-      context.go('/catalogo');
-    }
   }
 
   @override
   Widget build(BuildContext context) {
-    final authVm = context.watch<AuthViewModel>();
-    final title = widget.isRegister ? 'Crear Cuenta (Sign Up)' : 'Iniciar Sesión (Sign In)';
+    final authViewModel = context.watch<AuthViewModel>();
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    final bgColor = isDark ? const Color(0xFF0D0C14) : Colors.grey.shade100;
+    final cardBg = isDark ? const Color(0xFF171622) : Colors.white;
+    final textColor = isDark ? Colors.white : Colors.black87;
+    final hintColor = isDark ? Colors.white54 : Colors.grey.shade600;
 
     return Scaffold(
-      appBar: AppBar(title: Text(title), centerTitle: true),
-      body: Center(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(24),
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 420),
-            child: Card(
-              elevation: 3,
-              child: Padding(
-                padding: const EdgeInsets.all(24),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    const Icon(Icons.sports_esports, size: 64, color: Colors.deepPurple),
-                    const SizedBox(height: 12),
-                    Text(
-                      'GameBacklog Cloud',
-                      textAlign: TextAlign.center,
-                      style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                            fontWeight: FontWeight.bold,
-                          ),
-                    ),
-                    const SizedBox(height: 24),
-                    TextField(
-                      controller: _emailCtrl,
-                      keyboardType: TextInputType.emailAddress,
-                      decoration: const InputDecoration(
-                        labelText: 'Correo electrónico',
-                        prefixIcon: Icon(Icons.email_outlined),
-                        border: OutlineInputBorder(),
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    TextField(
-                      controller: _passCtrl,
-                      obscureText: true,
-                      decoration: const InputDecoration(
-                        labelText: 'Contraseña (mín. 6 caracteres)',
-                        prefixIcon: Icon(Icons.lock_outline),
-                        border: OutlineInputBorder(),
-                      ),
-                    ),
-                    if (authVm.errorMessage != null) ...[
-                      const SizedBox(height: 16),
-                      Container(
-                        padding: const EdgeInsets.all(12),
-                        decoration: BoxDecoration(
-                          color: Colors.red.shade50,
-                          borderRadius: BorderRadius.circular(8),
-                          border: Border.all(color: Colors.red.shade300),
-                        ),
-                        child: Row(
-                          children: [
-                            const Icon(Icons.error_outline, color: Colors.red),
-                            const SizedBox(width: 8),
-                            Expanded(
-                              child: Text(
-                                authVm.errorMessage!,
-                                style: const TextStyle(color: Colors.red),
-                              ),
+      backgroundColor: bgColor,
+      body: SafeArea(
+        child: Center(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.all(24.0),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                // --- Logo o Icono superior ---
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: cardBg,
+                    borderRadius: BorderRadius.circular(20),
+                    boxShadow: isDark ? [] : [const BoxShadow(color: Colors.black12, blurRadius: 6, offset: Offset(0, 3))],
+                  ),
+                  child: const Icon(
+                    Icons.sports_esports,
+                    size: 48,
+                    color: Color(0xFF7C5CFF),
+                  ),
+                ),
+                const SizedBox(height: 24),
+
+                // --- Título ---
+                Text(
+                  widget.isRegister ? 'Crea tu cuenta' : 'Bienvenido de nuevo',
+                  style: TextStyle(
+                    color: textColor,
+                    fontSize: 26,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  widget.isRegister
+                      ? 'Registra tus juegos en la nube'
+                      : 'Inicia sesión en tu colección',
+                  style: TextStyle(color: hintColor, fontSize: 14),
+                ),
+                const SizedBox(height: 32),
+
+                // --- Tarjeta del Formulario ---
+                Container(
+                  padding: const EdgeInsets.all(20),
+                  decoration: BoxDecoration(
+                    color: cardBg,
+                    borderRadius: BorderRadius.circular(20),
+                    boxShadow: isDark ? [] : [const BoxShadow(color: Colors.black12, blurRadius: 8, offset: Offset(0, 4))],
+                  ),
+                  child: Column(
+                    children: [
+                      // --- Campo Usuario o Correo con Label Flotante ---
+                      TextField(
+                        controller: _emailController,
+                        style: TextStyle(color: textColor),
+                        decoration: InputDecoration(
+                          labelText: 'Usuario o correo',
+                          labelStyle: TextStyle(color: hintColor),
+                          floatingLabelStyle: const TextStyle(color: Color(0xFF7C5CFF), fontWeight: FontWeight.bold),
+                          filled: true,
+                          fillColor: isDark ? const Color(0xFF1E1B2E) : Colors.grey.shade100,
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: BorderSide(
+                              color: isDark ? const Color(0xFF343246) : Colors.grey.shade300,
                             ),
-                          ],
+                          ),
+                          focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: const BorderSide(
+                              color: Color(0xFF7C5CFF),
+                              width: 2,
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 20),
+
+                      // --- Campo Contraseña con Label Flotante ---
+                      TextField(
+                        controller: _passwordController,
+                        obscureText: true,
+                        style: TextStyle(color: textColor),
+                        decoration: InputDecoration(
+                          labelText: 'Contraseña',
+                          labelStyle: TextStyle(color: hintColor),
+                          floatingLabelStyle: const TextStyle(color: Color(0xFF7C5CFF), fontWeight: FontWeight.bold),
+                          filled: true,
+                          fillColor: isDark ? const Color(0xFF1E1B2E) : Colors.grey.shade100,
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: BorderSide(
+                              color: isDark ? const Color(0xFF343246) : Colors.grey.shade300,
+                            ),
+                          ),
+                          focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: const BorderSide(
+                              color: Color(0xFF7C5CFF),
+                              width: 2,
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 24),
+
+                      // --- BOTÓN PRINCIPAL VISIBLE (#7C5CFF) ---
+                      SizedBox(
+                        width: double.infinity,
+                        height: 50,
+                        child: ElevatedButton(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFF7C5CFF),
+                            foregroundColor: Colors.white,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            elevation: 2,
+                          ),
+                          onPressed: authViewModel.isLoading
+                              ? null
+                              : () async {
+                                  final email = _emailController.text.trim();
+                                  final password = _passwordController.text.trim();
+
+                                  if (email.isEmpty || password.isEmpty) {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      const SnackBar(
+                                        content: Text('Por favor llena todos los campos'),
+                                      ),
+                                    );
+                                    return;
+                                  }
+
+                                  bool success;
+                                  if (widget.isRegister) {
+                                    success = await authViewModel.signUp(email, password);
+                                  } else {
+                                    success = await authViewModel.signIn(email, password);
+                                  }
+
+                                  if (!context.mounted) return;
+
+                                  if (success) {
+                                    context.go('/catalogo');
+                                  } else {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      SnackBar(
+                                        content: Text(authViewModel.errorMessage ?? 'Ocurrió un error'),
+                                      ),
+                                    );
+                                  }
+                                },
+                          child: authViewModel.isLoading
+                              ? const SizedBox(
+                                  width: 24,
+                                  height: 24,
+                                  child: CircularProgressIndicator(
+                                    color: Colors.white,
+                                    strokeWidth: 2,
+                                  ),
+                                )
+                              : Text(
+                                  widget.isRegister ? 'Registrarse' : 'Iniciar Sesión',
+                                  style: const TextStyle(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
                         ),
                       ),
                     ],
-                    const SizedBox(height: 24),
-                    SizedBox(
-                      height: 48,
-                      child: ElevatedButton(
-                        onPressed: authVm.isLoading ? null : _submit,
-                        child: authVm.isLoading
-                            ? const SizedBox(
-                                width: 24,
-                                height: 24,
-                                child: CircularProgressIndicator(strokeWidth: 2),
-                              )
-                            : Text(widget.isRegister ? 'Registrarse' : 'Entrar'),
-                      ),
+                  ),
+                ),
+                const SizedBox(height: 24),
+
+                // --- Enlace inferior para alternar ---
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Text(
+                      widget.isRegister
+                          ? '¿Ya tienes una cuenta?'
+                          : '¿No tienes una cuenta?',
+                      style: TextStyle(color: hintColor),
                     ),
-                    const SizedBox(height: 12),
                     TextButton(
-                      onPressed: authVm.isLoading
-                          ? null
-                          : () {
-                              authVm.clearError();
-                              if (widget.isRegister) {
-                                context.go('/login');
-                              } else {
-                                context.go('/registro');
-                              }
-                            },
+                      onPressed: () {
+                        if (widget.isRegister) {
+                          context.go('/login');
+                        } else {
+                          context.go('/registro');
+                        }
+                      },
                       child: Text(
-                        widget.isRegister
-                            ? '¿Ya tienes cuenta? Inicia sesión aquí'
-                            : '¿No tienes cuenta? Regístrate aquí',
+                        widget.isRegister ? 'Inicia sesión aquí' : 'Regístrate aquí',
+                        style: const TextStyle(
+                          color: Color(0xFF7C5CFF),
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
                     ),
                   ],
                 ),
-              ),
+              ],
             ),
           ),
         ),

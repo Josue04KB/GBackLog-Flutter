@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import '../../domain/models/game_models.dart';
-import '../auth/auth_view_model.dart';
 import '../widgets/ui_state.dart';
 import 'catalog_view_model.dart';
 
@@ -32,12 +31,12 @@ class _CatalogScreenState extends State<CatalogScreen> {
   Color _colorPorEstado(String estado) {
     switch (estado) {
       case 'Pendiente':
-        return const Color(0xFFFFA726); // Naranja
+        return const Color(0xFFFFA726);
       case 'Completado':
-        return const Color(0xFF7986CB); // Azul violáceo
+        return const Color(0xFF7986CB);
       case 'En progreso':
       case 'Jugando':
-        return const Color(0xFF26A69A); // Verde esmeralda
+        return const Color(0xFF26A69A);
       default:
         return Colors.grey;
     }
@@ -57,105 +56,7 @@ class _CatalogScreenState extends State<CatalogScreen> {
     return 'https://images.unsplash.com/photo-1550745165-9bc0b252726f?w=600&q=80';
   }
 
-  void _mostrarOpcionesYPlataformas() {
-    final catalogVm = context.read<CatalogViewModel>();
-    final authVm = context.read<AuthViewModel>();
-
-    showModalBottomSheet<void>(
-      context: context,
-      backgroundColor: const Color(0xFF1A1826),
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (sheetCtx) {
-        return Padding(
-          padding: const EdgeInsets.all(20),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  const Text(
-                    'Configuración y Plataformas',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  IconButton(
-                    tooltip: 'Recargar datos de Supabase',
-                    icon: const Icon(Icons.refresh, color: Colors.white70),
-                    onPressed: () {
-                      Navigator.of(sheetCtx).pop();
-                      catalogVm.cargarMaestros();
-                    },
-                  ),
-                ],
-              ),
-              if (authVm.userEmail != null)
-                Text(
-                  'Sesión activa: ${authVm.userEmail}',
-                  style: const TextStyle(color: Colors.white54, fontSize: 13),
-                ),
-              const SizedBox(height: 16),
-              const Text(
-                'Plataformas registradas (Entidad Maestra 1):',
-                style: TextStyle(color: Colors.white70, fontWeight: FontWeight.w600),
-              ),
-              const SizedBox(height: 8),
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                children: catalogVm.plataformas
-                    .map(
-                      (p) => Chip(
-                        backgroundColor: const Color(0xFF282538),
-                        label: Text(
-                          '${p.nombre} (${p.fabricante})',
-                          style: const TextStyle(color: Colors.white),
-                        ),
-                      ),
-                    )
-                    .toList(),
-              ),
-              const SizedBox(height: 20),
-              ListTile(
-                contentPadding: EdgeInsets.zero,
-                leading: const Icon(Icons.history, color: Color(0xFF7C5CFF)),
-                title: const Text(
-                  'Historial general de sesiones (Transacciones)',
-                  style: TextStyle(color: Colors.white),
-                ),
-                onTap: () {
-                  Navigator.of(sheetCtx).pop();
-                  context.push('/sesiones');
-                },
-              ),
-              ListTile(
-                contentPadding: EdgeInsets.zero,
-                leading: const Icon(Icons.logout, color: Colors.redAccent),
-                title: const Text(
-                  'Cerrar sesión',
-                  style: TextStyle(color: Colors.redAccent),
-                ),
-                onTap: () async {
-                  Navigator.of(sheetCtx).pop();
-                  await authVm.signOut();
-                  if (!mounted) return;
-                  context.go('/login');
-                },
-              ),
-            ],
-          ),
-        );
-      },
-    );
-  }
-
-  Future<void> _mostrarDialogoNuevoJuego() async {
+  Future<void> _mostrarDialogoNuevoJuego(bool isDark) async {
     final catalogVm = context.read<CatalogViewModel>();
     final tituloCtrl = TextEditingController();
     final generoCtrl = TextEditingController();
@@ -175,10 +76,10 @@ class _CatalogScreenState extends State<CatalogScreen> {
         return StatefulBuilder(
           builder: (ctx, setDialogState) {
             return AlertDialog(
-              backgroundColor: const Color(0xFF1A1826),
-              title: const Text(
+              backgroundColor: isDark ? const Color(0xFF1A1826) : Colors.white,
+              title: Text(
                 'Agregar a Mi Colección',
-                style: TextStyle(color: Colors.white),
+                style: TextStyle(color: isDark ? Colors.white : Colors.black87),
               ),
               content: SingleChildScrollView(
                 child: Column(
@@ -186,29 +87,29 @@ class _CatalogScreenState extends State<CatalogScreen> {
                   children: [
                     TextField(
                       controller: tituloCtrl,
-                      style: const TextStyle(color: Colors.white),
-                      decoration: const InputDecoration(
+                      style: TextStyle(color: isDark ? Colors.white : Colors.black87),
+                      decoration: InputDecoration(
                         labelText: 'Título del videojuego',
-                        labelStyle: TextStyle(color: Colors.white70),
+                        labelStyle: TextStyle(color: isDark ? Colors.white70 : Colors.black54),
                       ),
                     ),
                     const SizedBox(height: 12),
                     TextField(
                       controller: generoCtrl,
-                      style: const TextStyle(color: Colors.white),
-                      decoration: const InputDecoration(
+                      style: TextStyle(color: isDark ? Colors.white : Colors.black87),
+                      decoration: InputDecoration(
                         labelText: 'Género',
-                        labelStyle: TextStyle(color: Colors.white70),
+                        labelStyle: TextStyle(color: isDark ? Colors.white70 : Colors.black54),
                       ),
                     ),
                     const SizedBox(height: 12),
                     DropdownButtonFormField<String>(
                       initialValue: plataformaSeleccionada,
-                      dropdownColor: const Color(0xFF282538),
-                      style: const TextStyle(color: Colors.white),
-                      decoration: const InputDecoration(
+                      dropdownColor: isDark ? const Color(0xFF282538) : Colors.white,
+                      style: TextStyle(color: isDark ? Colors.white : Colors.black87),
+                      decoration: InputDecoration(
                         labelText: 'Plataforma',
-                        labelStyle: TextStyle(color: Colors.white70),
+                        labelStyle: TextStyle(color: isDark ? Colors.white70 : Colors.black54),
                       ),
                       items: opcionesPlataforma
                           .map((p) => DropdownMenuItem(value: p, child: Text(p)))
@@ -222,11 +123,11 @@ class _CatalogScreenState extends State<CatalogScreen> {
                     const SizedBox(height: 12),
                     DropdownButtonFormField<String>(
                       initialValue: estadoSeleccionado,
-                      dropdownColor: const Color(0xFF282538),
-                      style: const TextStyle(color: Colors.white),
-                      decoration: const InputDecoration(
+                      dropdownColor: isDark ? const Color(0xFF282538) : Colors.white,
+                      style: TextStyle(color: isDark ? Colors.white : Colors.black87),
+                      decoration: InputDecoration(
                         labelText: 'Estado',
-                        labelStyle: TextStyle(color: Colors.white70),
+                        labelStyle: TextStyle(color: isDark ? Colors.white70 : Colors.black54),
                       ),
                       items: const [
                         DropdownMenuItem(value: 'Pendiente', child: Text('Pendiente')),
@@ -242,10 +143,10 @@ class _CatalogScreenState extends State<CatalogScreen> {
                     const SizedBox(height: 12),
                     TextField(
                       controller: imagenCtrl,
-                      style: const TextStyle(color: Colors.white),
-                      decoration: const InputDecoration(
+                      style: TextStyle(color: isDark ? Colors.white : Colors.black87),
+                      decoration: InputDecoration(
                         labelText: 'URL de portada (opcional)',
-                        labelStyle: TextStyle(color: Colors.white70),
+                        labelStyle: TextStyle(color: isDark ? Colors.white70 : Colors.black54),
                       ),
                     ),
                   ],
@@ -291,50 +192,55 @@ class _CatalogScreenState extends State<CatalogScreen> {
   @override
   Widget build(BuildContext context) {
     final catalogVm = context.watch<CatalogViewModel>();
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    final bgColor = isDark ? const Color(0xFF0D0C14) : Colors.grey.shade100;
+    final textColor = isDark ? Colors.white : Colors.black87;
+    final subtextColor = isDark ? const Color(0xFF9E9EAB) : Colors.grey.shade600;
 
     return Scaffold(
-      backgroundColor: const Color(0xFF0D0C14),
+      backgroundColor: bgColor,
       body: SafeArea(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // --- Encabezado idéntico a Android Studio: ★ Mi Colección + ⚙ ---
+            // --- Encabezado ---
             Padding(
               padding: const EdgeInsets.fromLTRB(20, 16, 12, 4),
               child: Row(
                 children: [
                   const Icon(Icons.star, color: Color(0xFF7C5CFF), size: 28),
                   const SizedBox(width: 10),
-                  const Expanded(
+                  Expanded(
                     child: Text(
                       'Mi Colección',
                       style: TextStyle(
-                        color: Colors.white,
+                        color: textColor,
                         fontSize: 24,
                         fontWeight: FontWeight.bold,
                       ),
                     ),
                   ),
                   IconButton(
-                    tooltip: 'Opciones, Plataformas y Sesión',
-                    icon: const Icon(Icons.settings, color: Colors.white, size: 26),
-                    onPressed: _mostrarOpcionesYPlataformas,
+                    tooltip: 'Configuración',
+                    icon: Icon(Icons.settings, color: textColor, size: 26),
+                    onPressed: () => context.push('/config'),
                   ),
                 ],
               ),
             ),
 
-            // --- Subtítulo: X juegos en tu colección ---
+            // --- Subtítulo ---
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 20),
               child: Text(
                 '${catalogVm.videojuegos.length} juegos en tu colección',
-                style: const TextStyle(color: Color(0xFF9E9EAB), fontSize: 15),
+                style: TextStyle(color: subtextColor, fontSize: 15),
               ),
             ),
             const SizedBox(height: 16),
 
-            // --- Barra de filtros horizontales (Todos, En progreso, Pendiente, Completado) ---
+            // --- Filtros horizontales ---
             SizedBox(
               height: 40,
               child: ListView.separated(
@@ -352,19 +258,19 @@ class _CatalogScreenState extends State<CatalogScreen> {
                       decoration: BoxDecoration(
                         color: seleccionado
                             ? const Color(0xFF7C5CFF)
-                            : const Color(0xFF171622),
+                            : (isDark ? const Color(0xFF171622) : Colors.white),
                         borderRadius: BorderRadius.circular(24),
                         border: Border.all(
                           color: seleccionado
                               ? const Color(0xFF7C5CFF)
-                              : const Color(0xFF343246),
+                              : (isDark ? const Color(0xFF343246) : Colors.grey.shade300),
                         ),
                       ),
                       alignment: Alignment.center,
                       child: Text(
                         filtro,
                         style: TextStyle(
-                          color: seleccionado ? Colors.white : const Color(0xFFB0B0C0),
+                          color: seleccionado ? Colors.white : (isDark ? const Color(0xFFB0B0C0) : Colors.black54),
                           fontWeight: seleccionado ? FontWeight.bold : FontWeight.w500,
                           fontSize: 14,
                         ),
@@ -376,9 +282,9 @@ class _CatalogScreenState extends State<CatalogScreen> {
             ),
             const SizedBox(height: 16),
 
-            // --- Cuerpo con los 4 estados (Loading, Error, Empty, Grid Success) ---
+            // --- Cuerpo ---
             Expanded(
-              child: _buildBody(catalogVm),
+              child: _buildBody(catalogVm, isDark, textColor),
             ),
           ],
         ),
@@ -392,14 +298,14 @@ class _CatalogScreenState extends State<CatalogScreen> {
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(18),
           ),
-          onPressed: _mostrarDialogoNuevoJuego,
+          onPressed: () => _mostrarDialogoNuevoJuego(isDark),
           child: const Icon(Icons.add, color: Colors.white, size: 30),
         ),
       ),
     );
   }
 
-  Widget _buildBody(CatalogViewModel vm) {
+  Widget _buildBody(CatalogViewModel vm, bool isDark, Color textColor) {
     switch (vm.state) {
       case ViewState.loading:
         return const Center(
@@ -415,10 +321,10 @@ class _CatalogScreenState extends State<CatalogScreen> {
               children: [
                 const Icon(Icons.wifi_off, size: 64, color: Colors.redAccent),
                 const SizedBox(height: 16),
-                const Text(
+                Text(
                   'Sin conexión con Supabase',
                   style: TextStyle(
-                    color: Colors.white,
+                    color: textColor,
                     fontSize: 18,
                     fontWeight: FontWeight.bold,
                   ),
@@ -427,7 +333,7 @@ class _CatalogScreenState extends State<CatalogScreen> {
                 Text(
                   vm.errorMessage ?? 'Verifica tu conexión a internet.',
                   textAlign: TextAlign.center,
-                  style: const TextStyle(color: Colors.white60),
+                  style: TextStyle(color: isDark ? Colors.white60 : Colors.black54),
                 ),
                 const SizedBox(height: 20),
                 ElevatedButton.icon(
@@ -445,20 +351,20 @@ class _CatalogScreenState extends State<CatalogScreen> {
         );
 
       case ViewState.empty:
-        return const Center(
+        return Center(
           child: Text(
             'No hay juegos en tu colección.',
-            style: TextStyle(color: Colors.white60, fontSize: 16),
+            style: TextStyle(color: isDark ? Colors.white60 : Colors.black54, fontSize: 16),
           ),
         );
 
       case ViewState.success:
         final lista = vm.videojuegosFiltrados;
         if (lista.isEmpty) {
-          return const Center(
+          return Center(
             child: Text(
               'No hay juegos en este estado.',
-              style: TextStyle(color: Colors.white54, fontSize: 15),
+              style: TextStyle(color: isDark ? Colors.white54 : Colors.black54, fontSize: 15),
             ),
           );
         }
@@ -476,7 +382,7 @@ class _CatalogScreenState extends State<CatalogScreen> {
               ),
               itemCount: lista.length,
               itemBuilder: (context, index) {
-                return _buildGameCard(lista[index], vm);
+                return _buildGameCard(lista[index], vm, isDark);
               },
             );
           },
@@ -484,7 +390,7 @@ class _CatalogScreenState extends State<CatalogScreen> {
     }
   }
 
-  Widget _buildGameCard(Videojuego juego, CatalogViewModel vm) {
+  Widget _buildGameCard(Videojuego juego, CatalogViewModel vm, bool isDark) {
     final imageUrl = (juego.imagenUrl != null && juego.imagenUrl!.isNotEmpty)
         ? juego.imagenUrl!
         : _portadaPorDefecto(juego.titulo);
@@ -497,14 +403,14 @@ class _CatalogScreenState extends State<CatalogScreen> {
       },
       child: Container(
         decoration: BoxDecoration(
-          color: const Color(0xFF181624),
+          color: isDark ? const Color(0xFF181624) : Colors.white,
           borderRadius: BorderRadius.circular(18),
+          boxShadow: isDark ? [] : [BoxShadow(color: Colors.black12, blurRadius: 4, offset: Offset(0, 2))],
         ),
         padding: const EdgeInsets.all(10),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // --- Portada con etiqueta de plataforma en la esquina superior derecha ---
             Expanded(
               child: Stack(
                 fit: StackFit.expand,
@@ -515,10 +421,10 @@ class _CatalogScreenState extends State<CatalogScreen> {
                       imageUrl,
                       fit: BoxFit.cover,
                       errorBuilder: (_, _, _) => Container(
-                        color: const Color(0xFF282538),
-                        child: const Icon(
+                        color: isDark ? const Color(0xFF282538) : Colors.grey.shade200,
+                        child: Icon(
                           Icons.videogame_asset,
-                          color: Colors.white38,
+                          color: isDark ? Colors.white38 : Colors.grey.shade500,
                           size: 42,
                         ),
                       ),
@@ -550,21 +456,17 @@ class _CatalogScreenState extends State<CatalogScreen> {
               ),
             ),
             const SizedBox(height: 10),
-
-            // --- Título del juego ---
             Text(
               juego.titulo,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
-                color: Colors.white,
+              style: TextStyle(
+                color: isDark ? Colors.white : Colors.black87,
                 fontSize: 15,
                 fontWeight: FontWeight.bold,
               ),
             ),
             const SizedBox(height: 6),
-
-            // --- Punto de estado + Texto + Ícono de basurero ---
             Row(
               children: [
                 Container(
@@ -591,11 +493,11 @@ class _CatalogScreenState extends State<CatalogScreen> {
                 InkWell(
                   onTap: () => vm.borrarVideojuego(juego.id),
                   borderRadius: BorderRadius.circular(8),
-                  child: const Padding(
-                    padding: EdgeInsets.all(4),
+                  child: Padding(
+                    padding: const EdgeInsets.all(4),
                     child: Icon(
                       Icons.delete,
-                      color: Color(0xFF9E9EAB),
+                      color: isDark ? const Color(0xFF9E9EAB) : Colors.grey,
                       size: 18,
                     ),
                   ),

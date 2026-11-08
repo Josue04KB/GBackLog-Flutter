@@ -3,12 +3,14 @@ class Plataforma {
   final String nombre;
   final String fabricante;
   final String formatoDefault;
+  final String? userId;
 
   Plataforma({
     required this.id,
     required this.nombre,
     required this.fabricante,
     required this.formatoDefault,
+    this.userId,
   });
 
   factory Plataforma.fromJson(Map<String, dynamic> json) {
@@ -17,6 +19,7 @@ class Plataforma {
       nombre: json['nombre'] as String,
       fabricante: json['fabricante'] as String,
       formatoDefault: json['formato_default'] as String,
+      userId: json['user_id'] as String?,
     );
   }
 }

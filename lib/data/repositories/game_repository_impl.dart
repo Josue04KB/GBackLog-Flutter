@@ -35,6 +35,26 @@ class GameRepositoryImpl implements GameRepository {
   }
 
   @override
+  Future<void> crearPlataforma({
+    required String nombre,
+    required String fabricante,
+    required String formato,
+  }) async {
+    final userId = _remoteService.currentUser?.id;
+    await _remoteService.insertPlataforma({
+      'nombre': nombre.trim(),
+      'fabricante': fabricante.trim(),
+      'formato_default': formato.trim(),
+      'user_id': userId,
+    });
+  }
+
+  @override
+  Future<void> eliminarPlataforma(int id) async {
+    await _remoteService.deletePlataforma(id);
+  }
+
+  @override
   Future<List<Videojuego>> getVideojuegos() async {
     final rawList = await _remoteService.fetchVideojuegos();
     return rawList.map((json) => Videojuego.fromJson(json)).toList();
@@ -83,5 +103,15 @@ class GameRepositoryImpl implements GameRepository {
       'minutos_jugados': minutosJugados,
       'notas': notas,
     });
+  }
+
+  @override
+  Future<void> actualizarContrasena(String nuevaContrasena) async {
+    await _remoteService.updatePassword(nuevaContrasena);
+  }
+
+  @override
+  Future<void> eliminarCuentaUsuario() async {
+    await _remoteService.deleteAccount();
   }
 }

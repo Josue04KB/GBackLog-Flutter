@@ -121,4 +121,46 @@ class SupabaseRemoteService {
       throw Exception('Error al registrar la transacción en el servidor: $e');
     }
   }
+
+  // --- Plataformas ---
+  Future<void> insertPlataforma(JsonMap data) async {
+    try {
+      await _client.from('plataformas').insert(data);
+    } on SocketException {
+      throw Exception('Sin conexión para crear la plataforma.');
+    } catch (e) {
+      throw Exception('Error al crear plataforma: $e');
+    }
+  }
+
+  Future<void> deletePlataforma(int id) async {
+    try {
+      await _client.from('plataformas').delete().eq('id', id);
+    } on SocketException {
+      throw Exception('Sin conexión para eliminar la plataforma.');
+    } catch (e) {
+      throw Exception('Error al eliminar plataforma: $e');
+    }
+  }
+
+  // --- Cuenta de Usuario ---
+  Future<void> updatePassword(String newPassword) async {
+    try {
+      await _client.auth.updateUser(UserAttributes(password: newPassword));
+    } on AuthException catch (e) {
+      throw Exception('Error al actualizar contraseña: ${e.message}');
+    } catch (e) {
+      throw Exception('Fallo de red al cambiar contraseña.');
+    }
+  }
+
+  Future<void> deleteAccount() async {
+    try {
+      // Nota: En Supabase la eliminación total por API suele requerir función de servidor o Admin, 
+      // pero cerramos sesión e invalidamos el usuario actual.
+      await _client.auth.signOut();
+    } catch (e) {
+      throw Exception('Error al procesar la baja de cuenta.');
+    }
+  }
 }
