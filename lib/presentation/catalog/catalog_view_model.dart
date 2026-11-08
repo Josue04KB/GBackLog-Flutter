@@ -1,30 +1,27 @@
 import 'package:flutter/foundation.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../domain/models/game_models.dart';
-import '../../domain/repositories/game_repository.dart';
 import '../widgets/ui_state.dart';
 
 class CatalogViewModel extends ChangeNotifier {
-  final GameRepository _repository;
-
-  CatalogViewModel(this._repository);
+  CatalogViewModel([dynamic _]);
 
   ViewState _state = ViewState.loading;
   String? _errorMessage;
-  bool _isSubmitting = false;
-  String _filtroEstado = 'Todos';
-
-  List<Plataforma> _plataformas = [];
   List<Videojuego> _videojuegos = [];
+  List<Plataforma> _plataformas = [];
+  String _filtroEstado = 'Todos';
 
   ViewState get state => _state;
   String? get errorMessage => _errorMessage;
-  bool get isSubmitting => _isSubmitting;
-  String get filtroEstado => _filtroEstado;
-  List<Plataforma> get plataformas => _plataformas;
   List<Videojuego> get videojuegos => _videojuegos;
+  List<Plataforma> get plataformas => _plataformas;
+  String get filtroEstado => _filtroEstado;
 
   List<Videojuego> get videojuegosFiltrados {
-    if (_filtroEstado == 'Todos') return _videojuegos;
+    if (_filtroEstado == 'Todos') {
+      return _videojuegos;
+    }
     return _videojuegos.where((j) => j.estado == _filtroEstado).toList();
   }
 
@@ -39,13 +36,33 @@ class CatalogViewModel extends ChangeNotifier {
     notifyListeners();
 
     try {
-      final results = await Future.wait([
-        _repository.getPlataformas(),
-        _repository.getVideojuegos(),
-      ]);
+      final supabase = Supabase.instance.client;
+      final userId = supabase.auth.currentUser?.id;
 
-      _plataformas = results[0] as List<Plataforma>;
-      _videojuegos = results[1] as List<Videojuego>;
+      if (userId == null) {
+        throw Exception('Usuario no autenticado');
+      }
+
+      final responseJuegos = await supabase
+          .from('videojuegos')
+          .select()
+          .eq('user_id', userId)
+          .order('id', ascending: false);
+
+      _videojuegos = (responseJuegos as List)
+          .map((json) => Videojuego.fromJson(json))
+          .toList();
+
+      try {
+        final responsePlataformas = await supabase
+            .from('plataformas')
+            .select()
+            .order('nombre', ascending: true);
+
+        _plataformas = (responsePlataformas as List)
+            .map((json) => Plataforma.fromJson(json))
+            .toList();
+      } catch (_) {}
 
       if (_videojuegos.isEmpty) {
         _state = ViewState.empty;
@@ -66,38 +83,86 @@ class CatalogViewModel extends ChangeNotifier {
     required String plataforma,
     String? imagenUrl,
   }) async {
-    _isSubmitting = true;
-    _errorMessage = null;
-    notifyListeners();
-
     try {
-      await _repository.crearVideojuego(
-        titulo: titulo,
-        genero: genero,
-        estado: estado,
-        plataforma: plataforma,
-        imagenUrl: imagenUrl,
-      );
-      _isSubmitting = false;
+      final supabase = Supabase.instance.client;
+      final userId = supabase.auth.currentUser?.id;
+
+      if (userId == null) throw Exception('Usuario no autenticado');
+
+      await supabase.from('videojuegos').insert({
+        'user_id': userId,
+        'titulo': titulo,
+        'genero': genero,
+        'estado': estado,
+        'plataforma': plataforma,
+        'imagen_url': imagenUrl ?? '',
+      });
+
       await cargarMaestros();
       return true;
     } catch (e) {
-      _isSubmitting = false;
       _errorMessage = e.toString().replaceFirst('Exception: ', '');
       notifyListeners();
       return false;
     }
   }
 
-  Future<bool> borrarVideojuego(int id) async {
+  Future<bool> actualizarVideojuego({
+    required int id,
+    required String nuevoTitulo,
+    required String nuevoEstado,
+    required String nuevaImagenUrl,
+  }) async {
     try {
-      await _repository.eliminarVideojuego(id);
-      await cargarMaestros();
+      final supabase = Supabase.instance.client;
+
+      await supabase
+          .from('videojuegos')
+          .update({
+            'titulo': nuevoTitulo,
+            'estado': nuevoEstado,
+            'imagen_url': nuevaImagenUrl,
+          })
+          .eq('id', id);
+
+      final index = _videojuegos.indexWhere((j) => j.id == id);
+      if (index != -1) {
+        final actual = _videojuegos[index];
+        _videojuegos[index] = Videojuego(
+          id: actual.id,
+          titulo: nuevoTitulo,
+          genero: actual.genero,
+          estado: nuevoEstado,
+          plataforma: actual.plataforma,
+          imagenUrl: nuevaImagenUrl,
+        );
+      }
+
+      _state = _videojuegos.isEmpty ? ViewState.empty : ViewState.success;
+      notifyListeners();
       return true;
     } catch (e) {
       _errorMessage = e.toString().replaceFirst('Exception: ', '');
       notifyListeners();
       return false;
+    }
+  }
+
+  Future<void> borrarVideojuego(int id) async {
+    try {
+      final supabase = Supabase.instance.client;
+      await supabase.from('videojuegos').delete().eq('id', id);
+
+      _videojuegos.removeWhere((j) => j.id == id);
+      if (_videojuegos.isEmpty) {
+        _state = ViewState.empty;
+      } else {
+        _state = ViewState.success;
+      }
+      notifyListeners();
+    } catch (e) {
+      _errorMessage = e.toString().replaceFirst('Exception: ', '');
+      notifyListeners();
     }
   }
 }

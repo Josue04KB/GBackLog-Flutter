@@ -25,9 +25,15 @@ class SessionsScreen extends StatefulWidget {
 }
 
 class _SessionsScreenState extends State<SessionsScreen> {
+  // Variables locales para reflejar cambios inmediatamente en la pantalla
+  String? _tituloLocal;
+  String? _estadoLocal;
+  String? _imagenLocal;
+
   @override
   void initState() {
     super.initState();
+    _tituloLocal = widget.videojuegoTitulo;
     WidgetsBinding.instance.addPostFrameCallback((_) {
       context.read<SessionViewModel>().cargarSesiones(
             videojuegoId: widget.filtroVideojuegoId,
@@ -75,26 +81,33 @@ class _SessionsScreenState extends State<SessionsScreen> {
   Future<void> _abrirPantallaEditarJuego(
     BuildContext context,
     Videojuego? juegoActual,
-    String tituloFallback,
-    String imagenFallback,
+    String tituloActual,
+    String estadoActual,
+    String imagenActual,
   ) async {
     final juegoId = widget.filtroVideojuegoId;
     if (juegoId == null) return;
 
-    await Navigator.of(context).push(
+    // Sin el símbolo '>' después de push
+    final resultado = await Navigator.of(context).push(
       MaterialPageRoute(
         fullscreenDialog: true,
         builder: (_) => EditGameScreen(
           juegoId: juegoId,
-          tituloInicial: juegoActual?.titulo ?? tituloFallback,
-          estadoInicial: juegoActual?.estado ?? 'Pendiente',
-          imagenInicial: (juegoActual?.imagenUrl != null &&
-                  juegoActual!.imagenUrl!.isNotEmpty)
-              ? juegoActual.imagenUrl!
-              : imagenFallback,
+          tituloInicial: tituloActual,
+          estadoInicial: estadoActual,
+          imagenInicial: imagenActual,
         ),
       ),
     );
+
+    if (resultado is Map && mounted) {
+      setState(() {
+        _tituloLocal = resultado['titulo']?.toString();
+        _estadoLocal = resultado['estado']?.toString();
+        _imagenLocal = resultado['imagen_url']?.toString();
+      });
+    }
   }
 
   Future<void> _mostrarDialogoConfirmarEliminar(
@@ -345,7 +358,7 @@ class _SessionsScreenState extends State<SessionsScreen> {
   @override
   Widget build(BuildContext context) {
     final sessionVm = context.watch<SessionViewModel>();
-    final catalogVm = context.watch<CatalogViewModel>(); // Escucha cambios globales del catálogo
+    final catalogVm = context.watch<CatalogViewModel>();
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     final bgColor = isDark ? const Color(0xFF0D0C14) : Colors.grey.shade100;
@@ -363,12 +376,18 @@ class _SessionsScreenState extends State<SessionsScreen> {
       }
     }
 
+    // Prioriza el juego actualizado en el ViewModel o el valor recién editado
     final tituloMostrar =
-        juegoActual?.titulo ?? widget.videojuegoTitulo ?? 'Detalles del Juego';
-    final imagenMostrar =
-        (juegoActual?.imagenUrl != null && juegoActual!.imagenUrl!.isNotEmpty)
-            ? juegoActual.imagenUrl!
-            : _portadaPorDefecto(tituloMostrar);
+        juegoActual?.titulo ?? _tituloLocal ?? widget.videojuegoTitulo ?? 'Detalles del Juego';
+    final estadoMostrar =
+        juegoActual?.estado ?? _estadoLocal ?? 'Pendiente';
+    final plataformaMostrar =
+        juegoActual?.plataforma ?? 'PC';
+
+    final rawImagen = juegoActual?.imagenUrl ?? _imagenLocal;
+    final imagenMostrar = (rawImagen != null && rawImagen.isNotEmpty)
+        ? rawImagen
+        : _portadaPorDefecto(tituloMostrar);
 
     final totalSesiones = sessionVm.sesiones.length;
     final totalMinutos = sessionVm.sesiones.fold<int>(
@@ -399,6 +418,7 @@ class _SessionsScreenState extends State<SessionsScreen> {
                     context,
                     juegoActual,
                     tituloMostrar,
+                    estadoMostrar,
                     imagenMostrar,
                   );
                 } else if (valor == 'eliminar') {
@@ -481,43 +501,41 @@ class _SessionsScreenState extends State<SessionsScreen> {
                           fontWeight: FontWeight.bold,
                         ),
                       ),
-                      if (juegoActual != null) ...[
-                        const SizedBox(height: 6),
-                        Row(
-                          children: [
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 8,
-                                vertical: 3,
-                              ),
-                              decoration: BoxDecoration(
-                                color: const Color(0xFF7C5CFF)
-                                    .withValues(alpha: 0.18),
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                              child: Text(
-                                juegoActual.plataforma,
-                                style: const TextStyle(
-                                  color: Color(0xFF7C5CFF),
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.bold,
-                                ),
+                      const SizedBox(height: 6),
+                      Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 3,
+                            ),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF7C5CFF)
+                                  .withValues(alpha: 0.18),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Text(
+                              plataformaMostrar,
+                              style: const TextStyle(
+                                color: Color(0xFF7C5CFF),
+                                fontSize: 12,
+                                fontWeight: FontWeight.bold,
                               ),
                             ),
-                            const SizedBox(width: 8),
-                            Flexible(
-                              child: Text(
-                                juegoActual.estado,
-                                overflow: TextOverflow.ellipsis,
-                                style: TextStyle(
-                                  color: subtextColor,
-                                  fontSize: 12,
-                                ),
+                          ),
+                          const SizedBox(width: 8),
+                          Flexible(
+                            child: Text(
+                              estadoMostrar,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                color: subtextColor,
+                                fontSize: 12,
                               ),
                             ),
-                          ],
-                        ),
-                      ],
+                          ),
+                        ],
+                      ),
                       const SizedBox(height: 14),
                       Row(
                         children: [
@@ -875,10 +893,10 @@ class _EditGameScreenState extends State<EditGameScreen> {
                 ),
               ),
               const SizedBox(height: 10),
-              Row(
+              const Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Padding(
+                  Padding(
                     padding: EdgeInsets.only(top: 2),
                     child: Icon(
                       Icons.info_outline,
@@ -886,8 +904,8 @@ class _EditGameScreenState extends State<EditGameScreen> {
                       size: 16,
                     ),
                   ),
-                  const SizedBox(width: 8),
-                  const Expanded(
+                  SizedBox(width: 8),
+                  Expanded(
                     child: Text(
                       'Las imágenes de la galería permanecen en este dispositivo. '
                       'Utilice una URL de imagen para verlas en otros dispositivos.',
@@ -1059,26 +1077,37 @@ class _EditGameScreenState extends State<EditGameScreen> {
         }
       }
 
-      // Actualiza en Supabase
-      await supabase
-          .from('videojuegos')
-          .update({
-            'titulo': nuevoTitulo,
-            'estado': _estadoSeleccionado,
-            'imagen_url': urlFinal,
-          })
-          .eq('id', widget.juegoId);
-
       if (!mounted) return;
+      final catalogVm = context.read<CatalogViewModel>();
 
-      // FUERZA la recarga de datos en el ViewModel global para reflejar los cambios al instante
-      await context.read<CatalogViewModel>().cargarMaestros();
-
-      if (!mounted) return;
-      Navigator.of(context).pop();
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Juego actualizado con éxito')),
+      // Actualiza en Supabase y en la lista en memoria del ViewModel
+      final exito = await catalogVm.actualizarVideojuego(
+        id: widget.juegoId,
+        nuevoTitulo: nuevoTitulo,
+        nuevoEstado: _estadoSeleccionado,
+        nuevaImagenUrl: urlFinal,
       );
+
+      if (!mounted) return;
+
+      if (exito) {
+        // Devuelve los datos nuevos a SessionsScreen para redibujar de inmediato
+        Navigator.of(context).pop(<String, String>{
+          'titulo': nuevoTitulo,
+          'estado': _estadoSeleccionado,
+          'imagen_url': urlFinal,
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Juego actualizado con éxito')),
+        );
+      } else {
+        setState(() => _guardando = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(catalogVm.errorMessage ?? 'Error al guardar cambios'),
+          ),
+        );
+      }
     } catch (e) {
       if (!mounted) return;
       setState(() => _guardando = false);
