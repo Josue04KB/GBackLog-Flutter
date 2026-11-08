@@ -1,26 +1,28 @@
-import 'package:gamebacklog_cloud/presentation/settings/settings_screen.dart';
 import 'package:go_router/go_router.dart';
 import '../../presentation/auth/auth_screen.dart';
 import '../../presentation/auth/auth_view_model.dart';
+import '../../presentation/catalog/add_game_catalog_screen.dart';
 import '../../presentation/catalog/catalog_screen.dart';
 import '../../presentation/sessions/sessions_screen.dart';
+import '../../presentation/settings/settings_screen.dart';
+import '../../presentation/settings/user_profile_screen.dart';
 
 class AppRouter {
   static GoRouter createRouter(AuthViewModel authViewModel) {
     return GoRouter(
       initialLocation: '/catalogo',
-      // IMPORTANTE: Solo escucha la autenticación para proteger las rutas privadas
+      // Escucha únicamente los cambios de sesión (login / logout)
       refreshListenable: authViewModel,
       redirect: (context, state) {
         final isLoggedIn = authViewModel.isAuthenticated;
         final location = state.matchedLocation;
         final isAuthRoute = location == '/login' || location == '/registro';
 
-        // Si NO ha iniciado sesión y quiere entrar a pantallas privadas -> redirige a /login
+        // Si no está autenticado e intenta ir a rutas protegidas -> login
         if (!isLoggedIn && !isAuthRoute) {
           return '/login';
         }
-        // Si YA inició sesión y está en login/registro -> redirige al catálogo
+        // Si ya está autenticado e intenta ir a login/registro -> catálogo
         if (isLoggedIn && isAuthRoute) {
           return '/catalogo';
         }
@@ -40,13 +42,20 @@ class AppRouter {
           builder: (context, state) => const CatalogScreen(),
         ),
         GoRoute(
-          path: '/config', 
+          path: '/agregar_catalogo',
+          builder: (context, state) => const AddGameCatalogScreen(),
+        ),
+        GoRoute(
+          path: '/config',
           builder: (context, state) => const SettingsScreen(),
+        ),
+        GoRoute(
+          path: '/perfil',
+          builder: (context, state) => const UserProfileScreen(),
         ),
         GoRoute(
           path: '/sesiones',
           builder: (context, state) {
-            // Paso de parámetros por URL con go_router
             final juegoIdStr = state.uri.queryParameters['juegoId'];
             final titulo = state.uri.queryParameters['titulo'];
             final juegoId = juegoIdStr != null ? int.tryParse(juegoIdStr) : null;

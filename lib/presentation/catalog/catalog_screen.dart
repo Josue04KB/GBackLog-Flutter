@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../domain/models/game_models.dart';
 import '../widgets/ui_state.dart';
 import 'catalog_view_model.dart';
@@ -20,12 +21,24 @@ class _CatalogScreenState extends State<CatalogScreen> {
     'Completado',
   ];
 
+  String? _avatarUrl;
+
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       context.read<CatalogViewModel>().cargarMaestros();
     });
+    _cargarAvatar();
+  }
+
+  void _cargarAvatar() {
+    final user = Supabase.instance.client.auth.currentUser;
+    if (user != null && user.userMetadata != null) {
+      setState(() {
+        _avatarUrl = user.userMetadata!['avatar_url'];
+      });
+    }
   }
 
   Color _colorPorEstado(String estado) {
@@ -56,134 +69,62 @@ class _CatalogScreenState extends State<CatalogScreen> {
     return 'https://images.unsplash.com/photo-1550745165-9bc0b252726f?w=600&q=80';
   }
 
-  Future<void> _mostrarDialogoNuevoJuego(bool isDark) async {
-    final catalogVm = context.read<CatalogViewModel>();
-    final tituloCtrl = TextEditingController();
-    final generoCtrl = TextEditingController();
-    final imagenCtrl = TextEditingController();
-    String estadoSeleccionado = 'Pendiente';
-    String plataformaSeleccionada = catalogVm.plataformas.isNotEmpty
-        ? catalogVm.plataformas.first.nombre
-        : 'PS5';
-
-    final opcionesPlataforma = catalogVm.plataformas.isNotEmpty
-        ? catalogVm.plataformas.map((e) => e.nombre).toList()
-        : ['PS5', 'PC', 'Switch', 'Emulador'];
+  // Diálogo de confirmación para eliminar juego
+  Future<void> _mostrarDialogoConfirmarBorrarJuego(
+    Videojuego juego,
+    CatalogViewModel vm,
+    bool isDark,
+  ) async {
+    final nombreJuego = juego.titulo;
 
     await showDialog<void>(
       context: context,
       builder: (dialogCtx) {
-        return StatefulBuilder(
-          builder: (ctx, setDialogState) {
-            return AlertDialog(
-              backgroundColor: isDark ? const Color(0xFF1A1826) : Colors.white,
-              title: Text(
-                'Agregar a Mi Colección',
-                style: TextStyle(color: isDark ? Colors.white : Colors.black87),
-              ),
-              content: SingleChildScrollView(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    TextField(
-                      controller: tituloCtrl,
-                      style: TextStyle(color: isDark ? Colors.white : Colors.black87),
-                      decoration: InputDecoration(
-                        labelText: 'Título del videojuego',
-                        labelStyle: TextStyle(color: isDark ? Colors.white70 : Colors.black54),
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    TextField(
-                      controller: generoCtrl,
-                      style: TextStyle(color: isDark ? Colors.white : Colors.black87),
-                      decoration: InputDecoration(
-                        labelText: 'Género',
-                        labelStyle: TextStyle(color: isDark ? Colors.white70 : Colors.black54),
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    DropdownButtonFormField<String>(
-                      initialValue: plataformaSeleccionada,
-                      dropdownColor: isDark ? const Color(0xFF282538) : Colors.white,
-                      style: TextStyle(color: isDark ? Colors.white : Colors.black87),
-                      decoration: InputDecoration(
-                        labelText: 'Plataforma',
-                        labelStyle: TextStyle(color: isDark ? Colors.white70 : Colors.black54),
-                      ),
-                      items: opcionesPlataforma
-                          .map((p) => DropdownMenuItem(value: p, child: Text(p)))
-                          .toList(),
-                      onChanged: (val) {
-                        if (val != null) {
-                          setDialogState(() => plataformaSeleccionada = val);
-                        }
-                      },
-                    ),
-                    const SizedBox(height: 12),
-                    DropdownButtonFormField<String>(
-                      initialValue: estadoSeleccionado,
-                      dropdownColor: isDark ? const Color(0xFF282538) : Colors.white,
-                      style: TextStyle(color: isDark ? Colors.white : Colors.black87),
-                      decoration: InputDecoration(
-                        labelText: 'Estado',
-                        labelStyle: TextStyle(color: isDark ? Colors.white70 : Colors.black54),
-                      ),
-                      items: const [
-                        DropdownMenuItem(value: 'Pendiente', child: Text('Pendiente')),
-                        DropdownMenuItem(value: 'En progreso', child: Text('En progreso')),
-                        DropdownMenuItem(value: 'Completado', child: Text('Completado')),
-                      ],
-                      onChanged: (val) {
-                        if (val != null) {
-                          setDialogState(() => estadoSeleccionado = val);
-                        }
-                      },
-                    ),
-                    const SizedBox(height: 12),
-                    TextField(
-                      controller: imagenCtrl,
-                      style: TextStyle(color: isDark ? Colors.white : Colors.black87),
-                      decoration: InputDecoration(
-                        labelText: 'URL de portada (opcional)',
-                        labelStyle: TextStyle(color: isDark ? Colors.white70 : Colors.black54),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.of(dialogCtx).pop(),
-                  child: const Text('Cancelar'),
-                ),
-                ElevatedButton(
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF7C5CFF),
-                    foregroundColor: Colors.white,
+        return AlertDialog(
+          backgroundColor: isDark ? const Color(0xFF1A1826) : Colors.white,
+          title: Row(
+            children: [
+              const Icon(Icons.warning_amber_rounded, color: Colors.redAccent, size: 28),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  '¿Eliminar juego?',
+                  style: TextStyle(
+                    color: isDark ? Colors.white : Colors.black87,
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
                   ),
-                  onPressed: () async {
-                    if (tituloCtrl.text.trim().isEmpty) return;
-                    Navigator.of(dialogCtx).pop();
-                    final ok = await catalogVm.agregarVideojuego(
-                      titulo: tituloCtrl.text,
-                      genero: generoCtrl.text.isEmpty ? 'General' : generoCtrl.text,
-                      estado: estadoSeleccionado,
-                      plataforma: plataformaSeleccionada,
-                      imagenUrl: imagenCtrl.text,
-                    );
-                    if (!mounted) return;
-                    if (!ok) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(content: Text(catalogVm.errorMessage ?? 'Error al guardar')),
-                      );
-                    }
-                  },
-                  child: const Text('Guardar'),
                 ),
-              ],
-            );
-          },
+              ),
+            ],
+          ),
+          content: Text(
+            '¿Estás seguro de que deseas eliminar "$nombreJuego" de tu colección? Esta acción también borrará sus sesiones registradas y no se puede deshacer.',
+            style: TextStyle(color: isDark ? Colors.white70 : Colors.black54),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogCtx).pop(),
+              child: const Text('Cancelar'),
+            ),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.red.shade800,
+                foregroundColor: Colors.white,
+              ),
+              onPressed: () async {
+                Navigator.of(dialogCtx).pop();
+                await vm.borrarVideojuego(juego.id);
+                if (!mounted) return;
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text('"$nombreJuego" fue eliminado de tu colección'),
+                  ),
+                );
+              },
+              child: const Text('Sí, eliminar'),
+            ),
+          ],
         );
       },
     );
@@ -197,6 +138,7 @@ class _CatalogScreenState extends State<CatalogScreen> {
     final bgColor = isDark ? const Color(0xFF0D0C14) : Colors.grey.shade100;
     final textColor = isDark ? Colors.white : Colors.black87;
     final subtextColor = isDark ? const Color(0xFF9E9EAB) : Colors.grey.shade600;
+    final totalJuegos = catalogVm.videojuegos.length.toString();
 
     return Scaffold(
       backgroundColor: bgColor,
@@ -204,13 +146,28 @@ class _CatalogScreenState extends State<CatalogScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // --- Encabezado ---
+            // --- Encabezado: Avatar + Mi Colección + Configuración ---
             Padding(
               padding: const EdgeInsets.fromLTRB(20, 16, 12, 4),
               child: Row(
                 children: [
-                  const Icon(Icons.star, color: Color(0xFF7C5CFF), size: 28),
-                  const SizedBox(width: 10),
+                  GestureDetector(
+                    onTap: () async {
+                      await context.push('/perfil');
+                      _cargarAvatar();
+                    },
+                    child: CircleAvatar(
+                      radius: 18,
+                      backgroundColor: const Color(0xFF7C5CFF),
+                      backgroundImage: (_avatarUrl != null && _avatarUrl!.isNotEmpty)
+                          ? NetworkImage(_avatarUrl!)
+                          : null,
+                      child: (_avatarUrl == null || _avatarUrl!.isEmpty)
+                          ? const Icon(Icons.person, size: 20, color: Colors.white)
+                          : null,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
                   Expanded(
                     child: Text(
                       'Mi Colección',
@@ -224,17 +181,20 @@ class _CatalogScreenState extends State<CatalogScreen> {
                   IconButton(
                     tooltip: 'Configuración',
                     icon: Icon(Icons.settings, color: textColor, size: 26),
-                    onPressed: () => context.push('/config'),
+                    onPressed: () async {
+                      await context.push('/config');
+                      _cargarAvatar();
+                    },
                   ),
                 ],
               ),
             ),
 
-            // --- Subtítulo ---
+            // --- Subtítulo con contador corregido ---
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 20),
               child: Text(
-                '${catalogVm.videojuegos.length} juegos en tu colección',
+                '$totalJuegos juegos en tu colección',
                 style: TextStyle(color: subtextColor, fontSize: 15),
               ),
             ),
@@ -270,7 +230,9 @@ class _CatalogScreenState extends State<CatalogScreen> {
                       child: Text(
                         filtro,
                         style: TextStyle(
-                          color: seleccionado ? Colors.white : (isDark ? const Color(0xFFB0B0C0) : Colors.black54),
+                          color: seleccionado
+                              ? Colors.white
+                              : (isDark ? const Color(0xFFB0B0C0) : Colors.black54),
                           fontWeight: seleccionado ? FontWeight.bold : FontWeight.w500,
                           fontSize: 14,
                         ),
@@ -282,7 +244,7 @@ class _CatalogScreenState extends State<CatalogScreen> {
             ),
             const SizedBox(height: 16),
 
-            // --- Cuerpo ---
+            // --- Grid de juegos ---
             Expanded(
               child: _buildBody(catalogVm, isDark, textColor),
             ),
@@ -298,7 +260,7 @@ class _CatalogScreenState extends State<CatalogScreen> {
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(18),
           ),
-          onPressed: () => _mostrarDialogoNuevoJuego(isDark),
+          onPressed: () => context.push('/agregar_catalogo'),
           child: const Icon(Icons.add, color: Colors.white, size: 30),
         ),
       ),
@@ -399,13 +361,14 @@ class _CatalogScreenState extends State<CatalogScreen> {
     return GestureDetector(
       onTap: () {
         final encodedTitle = Uri.encodeComponent(juego.titulo);
-        context.push('/sesiones?juegoId=${juego.id}&titulo=$encodedTitle');
+        final idJuego = juego.id.toString();
+        context.push('/sesiones?juegoId=$idJuego&titulo=$encodedTitle');
       },
       child: Container(
         decoration: BoxDecoration(
           color: isDark ? const Color(0xFF181624) : Colors.white,
           borderRadius: BorderRadius.circular(18),
-          boxShadow: isDark ? [] : [BoxShadow(color: Colors.black12, blurRadius: 4, offset: Offset(0, 2))],
+          boxShadow: isDark ? [] : [const BoxShadow(color: Colors.black12, blurRadius: 4, offset: Offset(0, 2))],
         ),
         padding: const EdgeInsets.all(10),
         child: Column(
@@ -491,7 +454,7 @@ class _CatalogScreenState extends State<CatalogScreen> {
                   ),
                 ),
                 InkWell(
-                  onTap: () => vm.borrarVideojuego(juego.id),
+                  onTap: () => _mostrarDialogoConfirmarBorrarJuego(juego, vm, isDark),
                   borderRadius: BorderRadius.circular(8),
                   child: Padding(
                     padding: const EdgeInsets.all(4),
