@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import '../catalog/catalog_view_model.dart';
 import '../widgets/ui_state.dart';
 import 'session_view_model.dart';
+import 'package:intl/intl.dart';
 
 class SessionsScreen extends StatefulWidget {
   final int? filtroVideojuegoId;
@@ -260,8 +261,7 @@ class _SessionsScreenState extends State<SessionsScreen> {
           itemCount: vm.sesiones.length,
           itemBuilder: (context, index) {
             final s = vm.sesiones[index];
-            final fechaStr =
-                '${s.fecha.day.toString().padLeft(2, '0')}/${s.fecha.month.toString().padLeft(2, '0')}/${s.fecha.year}';
+            final fechaStr = DateFormat('dd/MM/yyyy HH:mm').format(s.fecha);
             return Card(
               margin: const EdgeInsets.only(bottom: 12),
               child: ListTile(
