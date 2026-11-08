@@ -25,7 +25,6 @@ class SessionsScreen extends StatefulWidget {
 }
 
 class _SessionsScreenState extends State<SessionsScreen> {
-  // Variables locales para reflejar cambios inmediatamente en la pantalla
   String? _tituloLocal;
   String? _estadoLocal;
   String? _imagenLocal;
