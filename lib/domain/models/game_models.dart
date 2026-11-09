@@ -53,6 +53,45 @@ class Videojuego {
   }
 }
 
+/// Juego disponible en el catálogo remoto que el usuario puede agregar a su
+/// colección. Se mantiene separado de [Videojuego] porque todavía no tiene
+/// estado ni plataforma elegida por el usuario.
+class JuegoCatalogo {
+  final String titulo;
+  final String genero;
+  final String desarrollador;
+  final String lanzamiento;
+  final String imagenUrl;
+  final String descripcion;
+
+  const JuegoCatalogo({
+    required this.titulo,
+    required this.genero,
+    required this.desarrollador,
+    required this.lanzamiento,
+    required this.imagenUrl,
+    required this.descripcion,
+  });
+
+  factory JuegoCatalogo.fromJson(Map<String, dynamic> json) {
+    String value(String key, String fallback) {
+      final rawValue = json[key];
+      if (rawValue == null) return fallback;
+      final text = rawValue.toString().trim();
+      return text.isEmpty ? fallback : text;
+    }
+
+    return JuegoCatalogo(
+      titulo: value('titulo', 'Sin título'),
+      genero: value('genero', 'Sin género'),
+      desarrollador: value('desarrollador', 'Desconocido'),
+      lanzamiento: value('lanzamiento', 'N/A'),
+      imagenUrl: value('imagen_url', ''),
+      descripcion: value('descripcion', 'Sin descripción.'),
+    );
+  }
+}
+
 class SesionJuego {
   final int id;
   final int videojuegoId;

@@ -14,6 +14,9 @@ class GameRepositoryImpl implements GameRepository {
   String? get currentUserEmail => _remoteService.currentUser?.email;
 
   @override
+  String? get currentUserAvatarUrl => _remoteService.currentUserAvatarUrl;
+
+  @override
   Future<void> signIn({required String email, required String password}) async {
     await _remoteService.signIn(email.trim(), password);
   }
@@ -41,6 +44,9 @@ class GameRepositoryImpl implements GameRepository {
     required String formato,
   }) async {
     final userId = _remoteService.currentUser?.id;
+    if (userId == null) {
+      throw Exception('Usuario no autenticado');
+    }
     await _remoteService.insertPlataforma({
       'nombre': nombre.trim(),
       'fabricante': fabricante.trim(),
@@ -61,6 +67,12 @@ class GameRepositoryImpl implements GameRepository {
   }
 
   @override
+  Future<List<JuegoCatalogo>> getCatalogoGlobal() async {
+    final rawList = await _remoteService.fetchCatalogoGlobal();
+    return rawList.map((json) => JuegoCatalogo.fromJson(json)).toList();
+  }
+
+  @override
   Future<void> crearVideojuego({
     required String titulo,
     required String genero,
@@ -68,7 +80,13 @@ class GameRepositoryImpl implements GameRepository {
     required String plataforma,
     String? imagenUrl,
   }) async {
+    final userId = _remoteService.currentUser?.id;
+    if (userId == null) {
+      throw Exception('Usuario no autenticado');
+    }
+
     await _remoteService.insertVideojuego({
+      'user_id': userId,
       'titulo': titulo.trim(),
       'genero': genero.trim(),
       'estado': estado,
@@ -80,13 +98,29 @@ class GameRepositoryImpl implements GameRepository {
   }
 
   @override
+  Future<void> actualizarVideojuego({
+    required int id,
+    required String titulo,
+    required String estado,
+    required String imagenUrl,
+  }) async {
+    await _remoteService.updateVideojuego(id, {
+      'titulo': titulo.trim(),
+      'estado': estado,
+      'imagen_url': imagenUrl.trim().isEmpty ? null : imagenUrl.trim(),
+    });
+  }
+
+  @override
   Future<void> eliminarVideojuego(int id) async {
     await _remoteService.deleteVideojuego(id);
   }
 
   @override
   Future<List<SesionJuego>> getSesiones({int? videojuegoId}) async {
-    final rawList = await _remoteService.fetchSesiones(videojuegoId: videojuegoId);
+    final rawList = await _remoteService.fetchSesiones(
+      videojuegoId: videojuegoId,
+    );
     return rawList.map((json) => SesionJuego.fromJson(json)).toList();
   }
 
@@ -108,6 +142,19 @@ class GameRepositoryImpl implements GameRepository {
   @override
   Future<void> actualizarContrasena(String nuevaContrasena) async {
     await _remoteService.updatePassword(nuevaContrasena);
+  }
+
+  @override
+  Future<String> subirImagen({
+    required String rutaLocal,
+    required String prefijo,
+  }) {
+    return _remoteService.uploadImage(localPath: rutaLocal, prefix: prefijo);
+  }
+
+  @override
+  Future<void> actualizarAvatarUrl(String avatarUrl) {
+    return _remoteService.updateAvatarUrl(avatarUrl);
   }
 
   @override

@@ -1,4 +1,5 @@
 import 'dart:io';
+
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 typedef JsonMap = Map<String, dynamic>;
@@ -8,10 +9,14 @@ class SupabaseRemoteService {
   final SupabaseClient _client;
 
   SupabaseRemoteService({SupabaseClient? client})
-      : _client = client ?? Supabase.instance.client;
+    : _client = client ?? Supabase.instance.client;
 
   Session? get currentSession => _client.auth.currentSession;
   User? get currentUser => _client.auth.currentUser;
+  String? get currentUserAvatarUrl {
+    final avatarUrl = currentUser?.userMetadata?['avatar_url'];
+    return avatarUrl is String && avatarUrl.isNotEmpty ? avatarUrl : null;
+  }
 
   Future<void> signIn(String email, String password) async {
     try {
@@ -19,7 +24,9 @@ class SupabaseRemoteService {
     } on AuthException catch (e) {
       throw Exception('Error de autenticación: ${e.message}');
     } on SocketException {
-      throw Exception('Sin conexión a internet. Verifica tu red e intenta de nuevo.');
+      throw Exception(
+        'Sin conexión a internet. Verifica tu red e intenta de nuevo.',
+      );
     } catch (e) {
       throw Exception('Fallo de red al iniciar sesión. Reintenta.');
     }
@@ -31,7 +38,9 @@ class SupabaseRemoteService {
     } on AuthException catch (e) {
       throw Exception('No se pudo registrar la cuenta: ${e.message}');
     } on SocketException {
-      throw Exception('Sin conexión a internet. Verifica tu red e intenta de nuevo.');
+      throw Exception(
+        'Sin conexión a internet. Verifica tu red e intenta de nuevo.',
+      );
     } catch (e) {
       throw Exception('Fallo de red al registrar usuario. Reintenta.');
     }
@@ -53,7 +62,9 @@ class SupabaseRemoteService {
           .order('id', ascending: true);
       return response;
     } on SocketException {
-      throw Exception('No hay conexión a internet para cargar las plataformas.');
+      throw Exception(
+        'No hay conexión a internet para cargar las plataformas.',
+      );
     } catch (e) {
       throw Exception('Error de red al consultar plataformas: $e');
     }
@@ -61,15 +72,35 @@ class SupabaseRemoteService {
 
   Future<JsonList> fetchVideojuegos() async {
     try {
+      final userId = currentUser?.id;
+      if (userId == null) {
+        throw Exception('Usuario no autenticado');
+      }
+
       final response = await _client
           .from('videojuegos')
           .select()
+          .eq('user_id', userId)
           .order('creado_en', ascending: false);
       return response;
     } on SocketException {
       throw Exception('No hay conexión a internet para cargar el catálogo.');
     } catch (e) {
       throw Exception('Error de red al consultar videojuegos: $e');
+    }
+  }
+
+  Future<JsonList> fetchCatalogoGlobal() async {
+    try {
+      final response = await _client
+          .from('catalogo_global')
+          .select()
+          .order('titulo', ascending: true);
+      return response;
+    } on SocketException {
+      throw Exception('No hay conexión a internet para cargar el catálogo.');
+    } catch (e) {
+      throw Exception('Error de red al consultar el catálogo: $e');
     }
   }
 
@@ -90,6 +121,16 @@ class SupabaseRemoteService {
       throw Exception('Sin conexión. No se pudo eliminar el videojuego.');
     } catch (e) {
       throw Exception('Error al eliminar videojuego: $e');
+    }
+  }
+
+  Future<void> updateVideojuego(int id, JsonMap data) async {
+    try {
+      await _client.from('videojuegos').update(data).eq('id', id);
+    } on SocketException {
+      throw Exception('Sin conexión. No se pudo actualizar el videojuego.');
+    } catch (e) {
+      throw Exception('Error al actualizar videojuego: $e');
     }
   }
 
@@ -143,6 +184,55 @@ class SupabaseRemoteService {
     }
   }
 
+  Future<String> uploadImage({
+    required String localPath,
+    required String prefix,
+  }) async {
+    try {
+      final userId = currentUser?.id;
+      if (userId == null) {
+        throw Exception('Usuario no autenticado');
+      }
+
+      final file = File(localPath);
+      if (!await file.exists()) {
+        throw Exception('No se encontró la imagen seleccionada.');
+      }
+
+      final extension = localPath.contains('.')
+          ? localPath.split('.').last.toLowerCase()
+          : 'jpg';
+      final fileName =
+          '$prefix-$userId-${DateTime.now().millisecondsSinceEpoch}.$extension';
+      final storagePath = 'public/$fileName';
+
+      await _client.storage
+          .from('avatars')
+          .upload(
+            storagePath,
+            file,
+            fileOptions: const FileOptions(upsert: true),
+          );
+      return _client.storage.from('avatars').getPublicUrl(storagePath);
+    } on SocketException {
+      throw Exception('Sin conexión. No se pudo subir la imagen.');
+    } catch (e) {
+      throw Exception('Error al subir la imagen: $e');
+    }
+  }
+
+  Future<void> updateAvatarUrl(String avatarUrl) async {
+    try {
+      await _client.auth.updateUser(
+        UserAttributes(data: {'avatar_url': avatarUrl}),
+      );
+    } on AuthException catch (e) {
+      throw Exception('Error al actualizar el perfil: ${e.message}');
+    } catch (e) {
+      throw Exception('No se pudo actualizar la foto de perfil.');
+    }
+  }
+
   // --- Cuenta de Usuario ---
   Future<void> updatePassword(String newPassword) async {
     try {
@@ -156,11 +246,10 @@ class SupabaseRemoteService {
 
   Future<void> deleteAccount() async {
     try {
-      // Nota: En Supabase la eliminación total por API suele requerir función de servidor o Admin, 
-      // pero cerramos sesión e invalidamos el usuario actual.
+      await _client.rpc('delete_user');
       await _client.auth.signOut();
     } catch (e) {
-      throw Exception('Error al procesar la baja de cuenta.');
+      throw Exception('Error al eliminar la cuenta.');
     }
   }
 }

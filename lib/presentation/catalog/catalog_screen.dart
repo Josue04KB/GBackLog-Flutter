@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
+
 import '../../domain/models/game_models.dart';
+import '../auth/auth_view_model.dart';
 import '../widgets/ui_state.dart';
 import 'catalog_view_model.dart';
 
@@ -21,24 +22,12 @@ class _CatalogScreenState extends State<CatalogScreen> {
     'Completado',
   ];
 
-  String? _avatarUrl;
-
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       context.read<CatalogViewModel>().cargarMaestros();
     });
-    _cargarAvatar();
-  }
-
-  void _cargarAvatar() {
-    final user = Supabase.instance.client.auth.currentUser;
-    if (user != null && user.userMetadata != null) {
-      setState(() {
-        _avatarUrl = user.userMetadata!['avatar_url'];
-      });
-    }
   }
 
   Color _colorPorEstado(String estado) {
@@ -72,11 +61,15 @@ class _CatalogScreenState extends State<CatalogScreen> {
   @override
   Widget build(BuildContext context) {
     final catalogVm = context.watch<CatalogViewModel>();
+    final authVm = context.watch<AuthViewModel>();
+    final avatarUrl = authVm.userAvatarUrl;
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     final bgColor = isDark ? const Color(0xFF0D0C14) : Colors.grey.shade100;
     final textColor = isDark ? Colors.white : Colors.black87;
-    final subtextColor = isDark ? const Color(0xFF9E9EAB) : Colors.grey.shade600;
+    final subtextColor = isDark
+        ? const Color(0xFF9E9EAB)
+        : Colors.grey.shade600;
     final totalJuegos = catalogVm.videojuegos.length;
 
     return Scaffold(
@@ -93,16 +86,21 @@ class _CatalogScreenState extends State<CatalogScreen> {
                   GestureDetector(
                     onTap: () async {
                       await context.push('/perfil');
-                      _cargarAvatar();
+                      if (context.mounted) authVm.notifyProfileChanged();
                     },
                     child: CircleAvatar(
                       radius: 18,
                       backgroundColor: const Color(0xFF7C5CFF),
-                      backgroundImage: (_avatarUrl != null && _avatarUrl!.isNotEmpty)
-                          ? NetworkImage(_avatarUrl!)
+                      backgroundImage:
+                          (avatarUrl != null && avatarUrl.isNotEmpty)
+                          ? NetworkImage(avatarUrl)
                           : null,
-                      child: (_avatarUrl == null || _avatarUrl!.isEmpty)
-                          ? const Icon(Icons.person, size: 20, color: Colors.white)
+                      child: (avatarUrl == null || avatarUrl.isEmpty)
+                          ? const Icon(
+                              Icons.person,
+                              size: 20,
+                              color: Colors.white,
+                            )
                           : null,
                     ),
                   ),
@@ -122,7 +120,7 @@ class _CatalogScreenState extends State<CatalogScreen> {
                     icon: Icon(Icons.settings, color: textColor, size: 26),
                     onPressed: () async {
                       await context.push('/config');
-                      _cargarAvatar();
+                      if (context.mounted) authVm.notifyProfileChanged();
                     },
                   ),
                 ],
@@ -153,7 +151,10 @@ class _CatalogScreenState extends State<CatalogScreen> {
                   return GestureDetector(
                     onTap: () => catalogVm.cambiarFiltro(filtro),
                     child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 20,
+                        vertical: 8,
+                      ),
                       decoration: BoxDecoration(
                         color: seleccionado
                             ? const Color(0xFF7C5CFF)
@@ -162,7 +163,9 @@ class _CatalogScreenState extends State<CatalogScreen> {
                         border: Border.all(
                           color: seleccionado
                               ? const Color(0xFF7C5CFF)
-                              : (isDark ? const Color(0xFF343246) : Colors.grey.shade300),
+                              : (isDark
+                                    ? const Color(0xFF343246)
+                                    : Colors.grey.shade300),
                         ),
                       ),
                       alignment: Alignment.center,
@@ -171,8 +174,12 @@ class _CatalogScreenState extends State<CatalogScreen> {
                         style: TextStyle(
                           color: seleccionado
                               ? Colors.white
-                              : (isDark ? const Color(0xFFB0B0C0) : Colors.black54),
-                          fontWeight: seleccionado ? FontWeight.bold : FontWeight.w500,
+                              : (isDark
+                                    ? const Color(0xFFB0B0C0)
+                                    : Colors.black54),
+                          fontWeight: seleccionado
+                              ? FontWeight.bold
+                              : FontWeight.w500,
                           fontSize: 14,
                         ),
                       ),
@@ -184,9 +191,7 @@ class _CatalogScreenState extends State<CatalogScreen> {
             const SizedBox(height: 16),
 
             // --- Grid de juegos ---
-            Expanded(
-              child: _buildBody(catalogVm, isDark, textColor),
-            ),
+            Expanded(child: _buildBody(catalogVm, isDark, textColor)),
           ],
         ),
       ),
@@ -234,7 +239,9 @@ class _CatalogScreenState extends State<CatalogScreen> {
                 Text(
                   vm.errorMessage ?? 'Verifica tu conexión a internet.',
                   textAlign: TextAlign.center,
-                  style: TextStyle(color: isDark ? Colors.white60 : Colors.black54),
+                  style: TextStyle(
+                    color: isDark ? Colors.white60 : Colors.black54,
+                  ),
                 ),
                 const SizedBox(height: 20),
                 ElevatedButton.icon(
@@ -255,7 +262,10 @@ class _CatalogScreenState extends State<CatalogScreen> {
         return Center(
           child: Text(
             'No hay juegos en tu colección.',
-            style: TextStyle(color: isDark ? Colors.white60 : Colors.black54, fontSize: 16),
+            style: TextStyle(
+              color: isDark ? Colors.white60 : Colors.black54,
+              fontSize: 16,
+            ),
           ),
         );
 
@@ -265,7 +275,10 @@ class _CatalogScreenState extends State<CatalogScreen> {
           return Center(
             child: Text(
               'No hay juegos en este estado.',
-              style: TextStyle(color: isDark ? Colors.white54 : Colors.black54, fontSize: 15),
+              style: TextStyle(
+                color: isDark ? Colors.white54 : Colors.black54,
+                fontSize: 15,
+              ),
             ),
           );
         }
@@ -309,7 +322,13 @@ class _CatalogScreenState extends State<CatalogScreen> {
           borderRadius: BorderRadius.circular(18),
           boxShadow: isDark
               ? []
-              : [const BoxShadow(color: Colors.black12, blurRadius: 4, offset: Offset(0, 2))],
+              : [
+                  const BoxShadow(
+                    color: Colors.black12,
+                    blurRadius: 4,
+                    offset: Offset(0, 2),
+                  ),
+                ],
         ),
         padding: const EdgeInsets.all(10),
         child: Column(
@@ -325,7 +344,9 @@ class _CatalogScreenState extends State<CatalogScreen> {
                       imageUrl,
                       fit: BoxFit.cover,
                       errorBuilder: (_, _, _) => Container(
-                        color: isDark ? const Color(0xFF282538) : Colors.grey.shade200,
+                        color: isDark
+                            ? const Color(0xFF282538)
+                            : Colors.grey.shade200,
                         child: Icon(
                           Icons.videogame_asset,
                           color: isDark ? Colors.white38 : Colors.grey.shade500,

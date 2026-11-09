@@ -1,8 +1,11 @@
 import 'dart:ui';
+
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
+
+import '../../domain/models/game_models.dart';
+import '../widgets/ui_state.dart';
 import 'catalog_view_model.dart';
 
 class AddGameCatalogScreen extends StatefulWidget {
@@ -13,20 +16,14 @@ class AddGameCatalogScreen extends StatefulWidget {
 }
 
 class _AddGameCatalogScreenState extends State<AddGameCatalogScreen> {
-  late final Future<List> _futureCatalogo;
-
   @override
   void initState() {
     super.initState();
-    _futureCatalogo = _cargarCatalogoDesdeSupabase();
-  }
-
-  Future<List> _cargarCatalogoDesdeSupabase() async {
-    final response = await Supabase.instance.client
-        .from('catalogo_global')
-        .select()
-        .order('titulo', ascending: true);
-    return List.from(response);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        context.read<CatalogViewModel>().cargarCatalogoGlobal();
+      }
+    });
   }
 
   @override
@@ -34,6 +31,7 @@ class _AddGameCatalogScreenState extends State<AddGameCatalogScreen> {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final bgColor = isDark ? const Color(0xFF0D0C14) : Colors.grey.shade100;
     final textColor = isDark ? Colors.white : Colors.black87;
+    final catalogVm = context.watch<CatalogViewModel>();
 
     return Scaffold(
       backgroundColor: bgColor,
@@ -42,103 +40,144 @@ class _AddGameCatalogScreenState extends State<AddGameCatalogScreen> {
         title: Text('Explorar Catálogo', style: TextStyle(color: textColor)),
         iconTheme: IconThemeData(color: textColor),
       ),
-      body: FutureBuilder<List>(
-        future: _futureCatalogo,
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(
-              child: CircularProgressIndicator(color: Color(0xFF7C5CFF)),
-            );
-          }
+      body: _buildCatalogBody(catalogVm, isDark, textColor),
+    );
+  }
 
-          if (snapshot.hasError || !snapshot.hasData || snapshot.data!.isEmpty) {
-            return Center(
-              child: Text(
-                'No se pudo cargar el catálogo de la nube.',
-                style: TextStyle(color: isDark ? Colors.white60 : Colors.black54),
-              ),
-            );
-          }
-
-          final juegos = snapshot.data!;
-
-          return GridView.builder(
-            padding: const EdgeInsets.all(16),
-            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-              crossAxisCount: 2,
-              crossAxisSpacing: 14,
-              mainAxisSpacing: 14,
-              childAspectRatio: 0.75,
-            ),
-            itemCount: juegos.length,
-            itemBuilder: (context, index) {
-              final juego = juegos[index];
-              return GestureDetector(
-                onTap: () => _mostrarHojaDetalleJuego(context, juego, isDark),
-                child: Container(
-                  decoration: BoxDecoration(
-                    color: isDark ? const Color(0xFF181624) : Colors.white,
-                    borderRadius: BorderRadius.circular(16),
-                    boxShadow: isDark
-                        ? []
-                        : [const BoxShadow(color: Colors.black12, blurRadius: 4, offset: Offset(0, 2))],
+  Widget _buildCatalogBody(
+    CatalogViewModel catalogVm,
+    bool isDark,
+    Color textColor,
+  ) {
+    switch (catalogVm.catalogoGlobalState) {
+      case ViewState.loading:
+        return const Center(
+          child: CircularProgressIndicator(color: Color(0xFF7C5CFF)),
+        );
+      case ViewState.error:
+        return Center(
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(Icons.wifi_off, size: 56, color: Colors.redAccent),
+                const SizedBox(height: 16),
+                Text(
+                  catalogVm.catalogoGlobalErrorMessage ??
+                      'No se pudo cargar el catálogo de la nube.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    color: isDark ? Colors.white60 : Colors.black54,
                   ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      Expanded(
-                        child: ClipRRect(
-                          borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
-                          child: Image.network(
-                            juego['imagen_url'] ?? '',
-                            fit: BoxFit.cover,
-                            errorBuilder: (ctx, err, _) => Container(
-                              color: isDark ? const Color(0xFF282538) : Colors.grey.shade200,
-                              child: Icon(
-                                Icons.image_not_supported,
-                                color: isDark ? Colors.white38 : Colors.grey,
-                              ),
+                ),
+                const SizedBox(height: 16),
+                ElevatedButton.icon(
+                  onPressed: () => catalogVm.cargarCatalogoGlobal(),
+                  icon: const Icon(Icons.refresh),
+                  label: const Text('Reintentar'),
+                ),
+              ],
+            ),
+          ),
+        );
+      case ViewState.empty:
+        return Center(
+          child: Text(
+            'No hay juegos disponibles en el catálogo.',
+            style: TextStyle(color: isDark ? Colors.white60 : Colors.black54),
+          ),
+        );
+      case ViewState.success:
+        final juegos = catalogVm.catalogoGlobal;
+        return GridView.builder(
+          padding: const EdgeInsets.all(16),
+          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: 2,
+            crossAxisSpacing: 14,
+            mainAxisSpacing: 14,
+            childAspectRatio: 0.75,
+          ),
+          itemCount: juegos.length,
+          itemBuilder: (context, index) {
+            final juego = juegos[index];
+            return GestureDetector(
+              onTap: () => _mostrarHojaDetalleJuego(context, juego, isDark),
+              child: Container(
+                decoration: BoxDecoration(
+                  color: isDark ? const Color(0xFF181624) : Colors.white,
+                  borderRadius: BorderRadius.circular(16),
+                  boxShadow: isDark
+                      ? []
+                      : [
+                          const BoxShadow(
+                            color: Colors.black12,
+                            blurRadius: 4,
+                            offset: Offset(0, 2),
+                          ),
+                        ],
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Expanded(
+                      child: ClipRRect(
+                        borderRadius: const BorderRadius.vertical(
+                          top: Radius.circular(16),
+                        ),
+                        child: Image.network(
+                          juego.imagenUrl,
+                          fit: BoxFit.cover,
+                          errorBuilder: (ctx, err, _) => Container(
+                            color: isDark
+                                ? const Color(0xFF282538)
+                                : Colors.grey.shade200,
+                            child: Icon(
+                              Icons.image_not_supported,
+                              color: isDark ? Colors.white38 : Colors.grey,
                             ),
                           ),
                         ),
                       ),
-                      Padding(
-                        padding: const EdgeInsets.all(10),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              juego['titulo'] ?? '',
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: TextStyle(
-                                color: textColor,
-                                fontWeight: FontWeight.bold,
-                                fontSize: 14,
-                              ),
+                    ),
+                    Padding(
+                      padding: const EdgeInsets.all(10),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            juego.titulo,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              color: textColor,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 14,
                             ),
-                            const SizedBox(height: 2),
-                            Text(
-                              juego['genero'] ?? '',
-                              style: const TextStyle(color: Color(0xFF7C5CFF), fontSize: 12),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            juego.genero,
+                            style: const TextStyle(
+                              color: Color(0xFF7C5CFF),
+                              fontSize: 12,
                             ),
-                          ],
-                        ),
+                          ),
+                        ],
                       ),
-                    ],
-                  ),
+                    ),
+                  ],
                 ),
-              );
-            },
-          );
-        },
-      ),
-    );
+              ),
+            );
+          },
+        );
+    }
   }
 
   void _mostrarHojaDetalleJuego(
     BuildContext parentContext,
-    Map<String, dynamic> juego,
+    JuegoCatalogo juego,
     bool isDark,
   ) {
     final catalogVm = parentContext.read<CatalogViewModel>();
@@ -158,12 +197,12 @@ class _AddGameCatalogScreenState extends State<AddGameCatalogScreen> {
     final textColor = isDark ? Colors.white : Colors.black87;
     final subtextColor = isDark ? Colors.white70 : Colors.black54;
 
-    final titulo = juego['titulo'] ?? '';
-    final genero = juego['genero'] ?? '';
-    final desarrollador = juego['desarrollador'] ?? 'Desconocido';
-    final lanzamiento = juego['lanzamiento'] ?? 'N/A';
-    final imagenUrl = juego['imagen_url'] ?? '';
-    final descripcion = juego['descripcion'] ?? 'Sin descripción.';
+    final titulo = juego.titulo;
+    final genero = juego.genero;
+    final desarrollador = juego.desarrollador;
+    final lanzamiento = juego.lanzamiento;
+    final imagenUrl = juego.imagenUrl;
+    final descripcion = juego.descripcion;
 
     showModalBottomSheet(
       context: parentContext,
@@ -178,7 +217,9 @@ class _AddGameCatalogScreenState extends State<AddGameCatalogScreen> {
               maxChildSize: 0.95,
               builder: (_, scrollController) {
                 return ClipRRect(
-                  borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+                  borderRadius: const BorderRadius.vertical(
+                    top: Radius.circular(28),
+                  ),
                   child: Container(
                     color: sheetBg,
                     child: Stack(
@@ -194,10 +235,14 @@ class _AddGameCatalogScreenState extends State<AddGameCatalogScreen> {
                               Image.network(
                                 imagenUrl,
                                 fit: BoxFit.cover,
-                                errorBuilder: (_, _, _) => const SizedBox.shrink(),
+                                errorBuilder: (_, _, _) =>
+                                    const SizedBox.shrink(),
                               ),
                               BackdropFilter(
-                                filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
+                                filter: ImageFilter.blur(
+                                  sigmaX: 18,
+                                  sigmaY: 18,
+                                ),
                                 child: Container(
                                   decoration: BoxDecoration(
                                     gradient: LinearGradient(
@@ -223,7 +268,9 @@ class _AddGameCatalogScreenState extends State<AddGameCatalogScreen> {
                                 width: 42,
                                 height: 5,
                                 decoration: BoxDecoration(
-                                  color: isDark ? Colors.white30 : Colors.black26,
+                                  color: isDark
+                                      ? Colors.white30
+                                      : Colors.black26,
                                   borderRadius: BorderRadius.circular(10),
                                 ),
                               ),
@@ -241,7 +288,11 @@ class _AddGameCatalogScreenState extends State<AddGameCatalogScreen> {
                                     color: Colors.black.withValues(alpha: 0.55),
                                     shape: BoxShape.circle,
                                   ),
-                                  child: const Icon(Icons.close, color: Colors.white, size: 22),
+                                  child: const Icon(
+                                    Icons.close,
+                                    color: Colors.white,
+                                    size: 22,
+                                  ),
                                 ),
                               ),
                             ),
@@ -253,7 +304,9 @@ class _AddGameCatalogScreenState extends State<AddGameCatalogScreen> {
                                   borderRadius: BorderRadius.circular(18),
                                   boxShadow: [
                                     BoxShadow(
-                                      color: Colors.black.withValues(alpha: 0.45),
+                                      color: Colors.black.withValues(
+                                        alpha: 0.45,
+                                      ),
                                       blurRadius: 16,
                                       offset: const Offset(0, 8),
                                     ),
@@ -292,8 +345,12 @@ class _AddGameCatalogScreenState extends State<AddGameCatalogScreen> {
                               height: 52,
                               child: ElevatedButton.icon(
                                 style: ElevatedButton.styleFrom(
-                                  backgroundColor: isDark ? Colors.white : const Color(0xFF7C5CFF),
-                                  foregroundColor: isDark ? Colors.black87 : Colors.white,
+                                  backgroundColor: isDark
+                                      ? Colors.white
+                                      : const Color(0xFF7C5CFF),
+                                  foregroundColor: isDark
+                                      ? Colors.black87
+                                      : Colors.white,
                                   elevation: 2,
                                   shape: RoundedRectangleBorder(
                                     borderRadius: BorderRadius.circular(30),
@@ -312,25 +369,37 @@ class _AddGameCatalogScreenState extends State<AddGameCatalogScreen> {
 
                                   if (ok) {
                                     parentContext.pop();
-                                    ScaffoldMessenger.of(parentContext).showSnackBar(
-                                      SnackBar(
-                                        content: Text('"$titulo" agregado a tu colección'),
-                                      ),
-                                    );
-                                  } else {
-                                    ScaffoldMessenger.of(parentContext).showSnackBar(
+                                    ScaffoldMessenger.of(
+                                      parentContext,
+                                    ).showSnackBar(
                                       SnackBar(
                                         content: Text(
-                                          catalogVm.errorMessage ?? 'Error al guardar',
+                                          '"$titulo" agregado a tu colección',
                                         ),
                                       ),
                                     );
+                                  } else {
+                                    ScaffoldMessenger.of(parentContext)
+                                        .showSnackBar(
+                                          SnackBar(
+                                            content: Text(
+                                              catalogVm.errorMessage ??
+                                                  'Error al guardar',
+                                            ),
+                                          ),
+                                        );
                                   }
                                 },
-                                icon: const Icon(Icons.library_add_outlined, size: 20),
+                                icon: const Icon(
+                                  Icons.library_add_outlined,
+                                  size: 20,
+                                ),
                                 label: const Text(
                                   'Agregar al Backlog',
-                                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                                  style: TextStyle(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.bold,
+                                  ),
                                 ),
                               ),
                             ),
@@ -341,7 +410,9 @@ class _AddGameCatalogScreenState extends State<AddGameCatalogScreen> {
                                 color: cardBg,
                                 borderRadius: BorderRadius.circular(24),
                                 border: Border.all(
-                                  color: isDark ? const Color(0xFF2E2B40) : Colors.grey.shade300,
+                                  color: isDark
+                                      ? const Color(0xFF2E2B40)
+                                      : Colors.grey.shade300,
                                 ),
                               ),
                               child: Row(
@@ -350,7 +421,9 @@ class _AddGameCatalogScreenState extends State<AddGameCatalogScreen> {
                                   Icon(
                                     Icons.info_outline,
                                     size: 18,
-                                    color: isDark ? Colors.white : const Color(0xFF7C5CFF),
+                                    color: isDark
+                                        ? Colors.white
+                                        : const Color(0xFF7C5CFF),
                                   ),
                                   const SizedBox(width: 8),
                                   Text(
@@ -380,7 +453,9 @@ class _AddGameCatalogScreenState extends State<AddGameCatalogScreen> {
                                 color: cardBg,
                                 borderRadius: BorderRadius.circular(18),
                                 border: Border.all(
-                                  color: isDark ? const Color(0xFF252236) : Colors.grey.shade200,
+                                  color: isDark
+                                      ? const Color(0xFF252236)
+                                      : Colors.grey.shade200,
                                 ),
                               ),
                               child: Column(
@@ -398,7 +473,8 @@ class _AddGameCatalogScreenState extends State<AddGameCatalogScreen> {
                                   ),
                                   const SizedBox(height: 8),
                                   GestureDetector(
-                                    onTap: () => setSheetState(() => leerMas = !leerMas),
+                                    onTap: () =>
+                                        setSheetState(() => leerMas = !leerMas),
                                     child: Text(
                                       leerMas ? 'Leer menos' : 'Leer más',
                                       style: TextStyle(
@@ -427,20 +503,39 @@ class _AddGameCatalogScreenState extends State<AddGameCatalogScreen> {
                                 color: cardBg,
                                 borderRadius: BorderRadius.circular(18),
                                 border: Border.all(
-                                  color: isDark ? const Color(0xFF252236) : Colors.grey.shade200,
+                                  color: isDark
+                                      ? const Color(0xFF252236)
+                                      : Colors.grey.shade200,
                                 ),
                               ),
                               child: Column(
                                 children: [
-                                  _buildFilaDetalle('Género', genero, textColor, subtextColor),
+                                  _buildFilaDetalle(
+                                    'Género',
+                                    genero,
+                                    textColor,
+                                    subtextColor,
+                                  ),
                                   const Divider(height: 22),
-                                  _buildFilaDetalle('Desarrollador', desarrollador, textColor, subtextColor),
+                                  _buildFilaDetalle(
+                                    'Desarrollador',
+                                    desarrollador,
+                                    textColor,
+                                    subtextColor,
+                                  ),
                                   const Divider(height: 22),
-                                  _buildFilaDetalle('Lanzamiento', lanzamiento, textColor, subtextColor),
+                                  _buildFilaDetalle(
+                                    'Lanzamiento',
+                                    lanzamiento,
+                                    textColor,
+                                    subtextColor,
+                                  ),
                                   const Divider(height: 26),
                                   DropdownButtonFormField<String>(
                                     initialValue: plataformaSeleccionada,
-                                    dropdownColor: isDark ? const Color(0xFF282538) : Colors.white,
+                                    dropdownColor: isDark
+                                        ? const Color(0xFF282538)
+                                        : Colors.white,
                                     style: TextStyle(color: textColor),
                                     decoration: InputDecoration(
                                       labelText: 'Plataforma para tu colección',
@@ -451,7 +546,9 @@ class _AddGameCatalogScreenState extends State<AddGameCatalogScreen> {
                                       enabledBorder: OutlineInputBorder(
                                         borderRadius: BorderRadius.circular(12),
                                         borderSide: BorderSide(
-                                          color: isDark ? const Color(0xFF343246) : Colors.grey.shade300,
+                                          color: isDark
+                                              ? const Color(0xFF343246)
+                                              : Colors.grey.shade300,
                                         ),
                                       ),
                                       focusedBorder: OutlineInputBorder(
@@ -463,18 +560,27 @@ class _AddGameCatalogScreenState extends State<AddGameCatalogScreen> {
                                       ),
                                     ),
                                     items: opcionesPlataforma
-                                        .map((p) => DropdownMenuItem(value: p, child: Text(p)))
+                                        .map(
+                                          (p) => DropdownMenuItem(
+                                            value: p,
+                                            child: Text(p),
+                                          ),
+                                        )
                                         .toList(),
                                     onChanged: (val) {
                                       if (val != null) {
-                                        setSheetState(() => plataformaSeleccionada = val);
+                                        setSheetState(
+                                          () => plataformaSeleccionada = val,
+                                        );
                                       }
                                     },
                                   ),
                                   const SizedBox(height: 14),
                                   DropdownButtonFormField<String>(
                                     initialValue: estadoSeleccionado,
-                                    dropdownColor: isDark ? const Color(0xFF282538) : Colors.white,
+                                    dropdownColor: isDark
+                                        ? const Color(0xFF282538)
+                                        : Colors.white,
                                     style: TextStyle(color: textColor),
                                     decoration: InputDecoration(
                                       labelText: 'Estado inicial',
@@ -485,7 +591,9 @@ class _AddGameCatalogScreenState extends State<AddGameCatalogScreen> {
                                       enabledBorder: OutlineInputBorder(
                                         borderRadius: BorderRadius.circular(12),
                                         borderSide: BorderSide(
-                                          color: isDark ? const Color(0xFF343246) : Colors.grey.shade300,
+                                          color: isDark
+                                              ? const Color(0xFF343246)
+                                              : Colors.grey.shade300,
                                         ),
                                       ),
                                       focusedBorder: OutlineInputBorder(
@@ -497,13 +605,24 @@ class _AddGameCatalogScreenState extends State<AddGameCatalogScreen> {
                                       ),
                                     ),
                                     items: const [
-                                      DropdownMenuItem(value: 'Pendiente', child: Text('Pendiente')),
-                                      DropdownMenuItem(value: 'En progreso', child: Text('En progreso')),
-                                      DropdownMenuItem(value: 'Completado', child: Text('Completado')),
+                                      DropdownMenuItem(
+                                        value: 'Pendiente',
+                                        child: Text('Pendiente'),
+                                      ),
+                                      DropdownMenuItem(
+                                        value: 'En progreso',
+                                        child: Text('En progreso'),
+                                      ),
+                                      DropdownMenuItem(
+                                        value: 'Completado',
+                                        child: Text('Completado'),
+                                      ),
                                     ],
                                     onChanged: (val) {
                                       if (val != null) {
-                                        setSheetState(() => estadoSeleccionado = val);
+                                        setSheetState(
+                                          () => estadoSeleccionado = val,
+                                        );
                                       }
                                     },
                                   ),
@@ -534,7 +653,14 @@ class _AddGameCatalogScreenState extends State<AddGameCatalogScreen> {
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
         Text(etiqueta, style: TextStyle(color: subtextColor, fontSize: 14)),
-        Text(valor, style: TextStyle(color: textColor, fontWeight: FontWeight.bold, fontSize: 14)),
+        Text(
+          valor,
+          style: TextStyle(
+            color: textColor,
+            fontWeight: FontWeight.bold,
+            fontSize: 14,
+          ),
+        ),
       ],
     );
   }

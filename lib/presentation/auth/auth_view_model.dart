@@ -1,4 +1,5 @@
 import 'package:flutter/foundation.dart';
+
 import '../../domain/repositories/game_repository.dart';
 
 class AuthViewModel extends ChangeNotifier {
@@ -13,6 +14,11 @@ class AuthViewModel extends ChangeNotifier {
   String? get errorMessage => _errorMessage;
   bool get isAuthenticated => _repository.hasValidSession;
   String? get userEmail => _repository.currentUserEmail;
+  String? get userAvatarUrl => _repository.currentUserAvatarUrl;
+
+  /// Notifica a las vistas que los metadatos del usuario cambiaron fuera del
+  /// flujo de autenticación, por ejemplo después de actualizar el avatar.
+  void notifyProfileChanged() => notifyListeners();
 
   void clearError() {
     _errorMessage = null;

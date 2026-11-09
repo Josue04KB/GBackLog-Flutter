@@ -1,10 +1,11 @@
 import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
+
 import '../../domain/models/game_models.dart';
 import '../catalog/catalog_view_model.dart';
 import '../widgets/ui_state.dart';
@@ -35,8 +36,8 @@ class _SessionsScreenState extends State<SessionsScreen> {
     _tituloLocal = widget.videojuegoTitulo;
     WidgetsBinding.instance.addPostFrameCallback((_) {
       context.read<SessionViewModel>().cargarSesiones(
-            videojuegoId: widget.filtroVideojuegoId,
-          );
+        videojuegoId: widget.filtroVideojuegoId,
+      );
     });
   }
 
@@ -166,7 +167,9 @@ class _SessionsScreenState extends State<SessionsScreen> {
                 context.pop();
                 ScaffoldMessenger.of(context).showSnackBar(
                   SnackBar(
-                    content: Text('"$tituloJuego" fue eliminado de tu biblioteca'),
+                    content: Text(
+                      '"$tituloJuego" fue eliminado de tu biblioteca',
+                    ),
                   ),
                 );
               },
@@ -185,11 +188,11 @@ class _SessionsScreenState extends State<SessionsScreen> {
     final sessionVm = context.read<SessionViewModel>();
     final catalogVm = context.read<CatalogViewModel>();
 
-    final minutosCtrl = TextEditingController();
-    final notasCtrl = TextEditingController();
-
-    final int? juegoSeleccionadoId = widget.filtroVideojuegoId ??
-        (catalogVm.videojuegos.isNotEmpty ? catalogVm.videojuegos.first.id : null);
+    final int? juegoSeleccionadoId =
+        widget.filtroVideojuegoId ??
+        (catalogVm.videojuegos.isNotEmpty
+            ? catalogVm.videojuegos.first.id
+            : null);
 
     int? plataformaSeleccionadaId;
     if (catalogVm.plataformas.isNotEmpty) {
@@ -201,6 +204,26 @@ class _SessionsScreenState extends State<SessionsScreen> {
       plataformaSeleccionadaId = coincidencia.isNotEmpty
           ? coincidencia.first.id
           : catalogVm.plataformas.first.id;
+    }
+
+    if (juegoSeleccionadoId == null || catalogVm.plataformas.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Agrega al menos un videojuego y una plataforma antes de registrar una sesión.',
+          ),
+        ),
+      );
+      return;
+    }
+
+    final formKey = GlobalKey<FormState>();
+    final minutosCtrl = TextEditingController();
+    final notasCtrl = TextEditingController();
+    if (!catalogVm.plataformas.any(
+      (platform) => platform.id == plataformaSeleccionadaId,
+    )) {
+      plataformaSeleccionadaId = null;
     }
 
     await showDialog<void>(
@@ -215,14 +238,16 @@ class _SessionsScreenState extends State<SessionsScreen> {
                 style: TextStyle(color: isDark ? Colors.white : Colors.black87),
               ),
               content: SingleChildScrollView(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    if (catalogVm.plataformas.isNotEmpty) ...[
+                child: Form(
+                  key: formKey,
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
                       DropdownButtonFormField<int>(
                         initialValue: plataformaSeleccionadaId,
-                        dropdownColor:
-                            isDark ? const Color(0xFF282538) : Colors.white,
+                        dropdownColor: isDark
+                            ? const Color(0xFF282538)
+                            : Colors.white,
                         style: TextStyle(
                           color: isDark ? Colors.white : Colors.black87,
                         ),
@@ -240,41 +265,67 @@ class _SessionsScreenState extends State<SessionsScreen> {
                               ),
                             )
                             .toList(),
-                        onChanged: (val) {
-                          if (val != null) {
-                            setDialogState(() => plataformaSeleccionadaId = val);
-                          }
+                        validator: (value) =>
+                            value == null ? 'Selecciona una plataforma' : null,
+                        onChanged: (value) {
+                          setDialogState(
+                            () => plataformaSeleccionadaId = value,
+                          );
                         },
                       ),
                       const SizedBox(height: 12),
+                      TextFormField(
+                        controller: minutosCtrl,
+                        keyboardType: TextInputType.number,
+                        textInputAction: TextInputAction.next,
+                        autovalidateMode: AutovalidateMode.onUserInteraction,
+                        style: TextStyle(
+                          color: isDark ? Colors.white : Colors.black87,
+                        ),
+                        decoration: InputDecoration(
+                          labelText: 'Minutos jugados',
+                          helperText: 'Entre 1 y 1440 minutos',
+                          labelStyle: TextStyle(
+                            color: isDark ? Colors.white70 : Colors.black54,
+                          ),
+                        ),
+                        validator: (value) {
+                          final minutes = int.tryParse(value?.trim() ?? '');
+                          if (minutes == null) {
+                            return 'Ingresa una cantidad válida de minutos';
+                          }
+                          if (minutes < 1 || minutes > 1440) {
+                            return 'El tiempo debe estar entre 1 y 1440 minutos';
+                          }
+                          return null;
+                        },
+                      ),
+                      const SizedBox(height: 12),
+                      TextFormField(
+                        controller: notasCtrl,
+                        minLines: 2,
+                        maxLines: 4,
+                        textInputAction: TextInputAction.done,
+                        autovalidateMode: AutovalidateMode.onUserInteraction,
+                        style: TextStyle(
+                          color: isDark ? Colors.white : Colors.black87,
+                        ),
+                        decoration: InputDecoration(
+                          labelText: 'Notas o progreso logrado',
+                          helperText: 'Escribe al menos 5 caracteres',
+                          labelStyle: TextStyle(
+                            color: isDark ? Colors.white70 : Colors.black54,
+                          ),
+                        ),
+                        validator: (value) {
+                          if ((value?.trim().length ?? 0) < 5) {
+                            return 'Describe el progreso en al menos 5 caracteres';
+                          }
+                          return null;
+                        },
+                      ),
                     ],
-                    TextField(
-                      controller: minutosCtrl,
-                      keyboardType: TextInputType.number,
-                      style: TextStyle(
-                        color: isDark ? Colors.white : Colors.black87,
-                      ),
-                      decoration: InputDecoration(
-                        labelText: 'Minutos jugados (> 0)',
-                        labelStyle: TextStyle(
-                          color: isDark ? Colors.white70 : Colors.black54,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    TextField(
-                      controller: notasCtrl,
-                      style: TextStyle(
-                        color: isDark ? Colors.white : Colors.black87,
-                      ),
-                      decoration: InputDecoration(
-                        labelText: 'Notas o progreso logrado',
-                        labelStyle: TextStyle(
-                          color: isDark ? Colors.white70 : Colors.black54,
-                        ),
-                      ),
-                    ),
-                  ],
+                  ),
                 ),
               ),
               actions: [
@@ -288,7 +339,9 @@ class _SessionsScreenState extends State<SessionsScreen> {
                     foregroundColor: Colors.white,
                   ),
                   onPressed: () async {
-                    final mins = int.tryParse(minutosCtrl.text.trim()) ?? 0;
+                    if (!(formKey.currentState?.validate() ?? false)) return;
+
+                    final mins = int.parse(minutosCtrl.text.trim());
                     Navigator.of(dialogCtx).pop();
 
                     final ok = await sessionVm.registrarNuevaSesion(
@@ -304,7 +357,8 @@ class _SessionsScreenState extends State<SessionsScreen> {
                       ScaffoldMessenger.of(context).showSnackBar(
                         SnackBar(
                           content: Text(
-                            sessionVm.errorMessage ?? 'Error al registrar sesión',
+                            sessionVm.errorMessage ??
+                                'Error al registrar sesión',
                           ),
                         ),
                       );
@@ -318,6 +372,9 @@ class _SessionsScreenState extends State<SessionsScreen> {
         );
       },
     );
+
+    minutosCtrl.dispose();
+    notasCtrl.dispose();
   }
 
   Widget _buildPosterImage(String imagePath, bool isDark) {
@@ -377,11 +434,12 @@ class _SessionsScreenState extends State<SessionsScreen> {
 
     // Prioriza el juego actualizado en el ViewModel o el valor recién editado
     final tituloMostrar =
-        juegoActual?.titulo ?? _tituloLocal ?? widget.videojuegoTitulo ?? 'Detalles del Juego';
-    final estadoMostrar =
-        juegoActual?.estado ?? _estadoLocal ?? 'Pendiente';
-    final plataformaMostrar =
-        juegoActual?.plataforma ?? 'PC';
+        juegoActual?.titulo ??
+        _tituloLocal ??
+        widget.videojuegoTitulo ??
+        'Detalles del Juego';
+    final estadoMostrar = juegoActual?.estado ?? _estadoLocal ?? 'Pendiente';
+    final plataformaMostrar = juegoActual?.plataforma ?? 'PC';
 
     final rawImagen = juegoActual?.imagenUrl ?? _imagenLocal;
     final imagenMostrar = (rawImagen != null && rawImagen.isNotEmpty)
@@ -443,7 +501,11 @@ class _SessionsScreenState extends State<SessionsScreen> {
                   value: 'eliminar',
                   child: Row(
                     children: [
-                      Icon(Icons.delete_outline, color: Colors.redAccent, size: 20),
+                      Icon(
+                        Icons.delete_outline,
+                        color: Colors.redAccent,
+                        size: 20,
+                      ),
                       SizedBox(width: 10),
                       Text(
                         'Eliminar de la biblioteca',
@@ -676,9 +738,32 @@ class _SessionsScreenState extends State<SessionsScreen> {
 
       case ViewState.error:
         return Center(
-          child: Text(
-            vm.errorMessage ?? 'Error al cargar las sesiones',
-            style: TextStyle(color: subtextColor),
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(Icons.wifi_off, size: 48, color: Colors.redAccent),
+                const SizedBox(height: 12),
+                Text(
+                  vm.errorMessage ?? 'Error al cargar las sesiones',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(color: subtextColor),
+                ),
+                const SizedBox(height: 16),
+                ElevatedButton.icon(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF7C5CFF),
+                    foregroundColor: Colors.white,
+                  ),
+                  onPressed: () => vm.cargarSesiones(
+                    videojuegoId: widget.filtroVideojuegoId,
+                  ),
+                  icon: const Icon(Icons.refresh),
+                  label: const Text('Reintentar'),
+                ),
+              ],
+            ),
           ),
         );
 
@@ -704,8 +789,8 @@ class _SessionsScreenState extends State<SessionsScreen> {
               ),
               child: ListTile(
                 leading: CircleAvatar(
-                  backgroundColor:
-                      const Color(0xFF7C5CFF).withValues(alpha: 0.2),
+                  backgroundColor: const Color(0xFF7C5CFF)
+                      .withValues(alpha: 0.2),
                   child: const Icon(
                     Icons.access_time,
                     color: Color(0xFF7C5CFF),
@@ -794,8 +879,9 @@ class _EditGameScreenState extends State<EditGameScreen> {
   void _mostrarMenuCambiarPoster(bool isDark) {
     final sheetBg = isDark ? const Color(0xFF14131D) : Colors.white;
     final textColor = isDark ? Colors.white : Colors.black87;
-    final iconCircleBg =
-        isDark ? const Color(0xFF252332) : Colors.grey.shade200;
+    final iconCircleBg = isDark
+        ? const Color(0xFF252332)
+        : Colors.grey.shade200;
 
     showModalBottomSheet<void>(
       context: context,
@@ -936,11 +1022,7 @@ class _EditGameScreenState extends State<EditGameScreen> {
                           color: iconCircleBg,
                           shape: BoxShape.circle,
                         ),
-                        child: Icon(
-                          Icons.link,
-                          color: textColor,
-                          size: 24,
-                        ),
+                        child: Icon(Icons.link, color: textColor, size: 24),
                       ),
                       const SizedBox(width: 16),
                       Expanded(
@@ -1046,7 +1128,9 @@ class _EditGameScreenState extends State<EditGameScreen> {
     final nuevoTitulo = _tituloCtrl.text.trim();
     if (nuevoTitulo.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('El nombre del juego no puede estar vacío')),
+        const SnackBar(
+          content: Text('El nombre del juego no puede estar vacío'),
+        ),
       );
       return;
     }
@@ -1054,32 +1138,31 @@ class _EditGameScreenState extends State<EditGameScreen> {
     setState(() => _guardando = true);
 
     try {
-      final supabase = Supabase.instance.client;
+      final catalogVm = context.read<CatalogViewModel>();
       String urlFinal = _imagenActual;
 
       if (_archivoGaleria != null) {
-        try {
-          final userId = supabase.auth.currentUser?.id ?? 'user';
-          final ext = _archivoGaleria!.path.split('.').last;
-          final fileName =
-              'cover-$userId-${DateTime.now().millisecondsSinceEpoch}.$ext';
-          final filePath = 'public/$fileName';
-
-          await supabase.storage.from('avatars').upload(
-                filePath,
-                _archivoGaleria!,
-                fileOptions: const FileOptions(upsert: true),
-              );
-          urlFinal = supabase.storage.from('avatars').getPublicUrl(filePath);
-        } catch (_) {
-          urlFinal = _archivoGaleria!.path;
+        final uploadedUrl = await catalogVm.subirPortada(_archivoGaleria!.path);
+        if (uploadedUrl == null) {
+          if (mounted) {
+            setState(() => _guardando = false);
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(
+                  catalogVm.errorMessage ??
+                      'No se pudo subir la portada. Reintenta.',
+                ),
+              ),
+            );
+          }
+          return;
         }
+        urlFinal = uploadedUrl;
       }
 
       if (!mounted) return;
-      final catalogVm = context.read<CatalogViewModel>();
 
-      // Actualiza en Supabase y en la lista en memoria del ViewModel
+      // Actualiza a través del ViewModel y la lista en memoria.
       final exito = await catalogVm.actualizarVideojuego(
         id: widget.juegoId,
         nuevoTitulo: nuevoTitulo,
@@ -1110,9 +1193,9 @@ class _EditGameScreenState extends State<EditGameScreen> {
     } catch (e) {
       if (!mounted) return;
       setState(() => _guardando = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error al guardar cambios: $e')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Error al guardar cambios: $e')));
     }
   }
 
@@ -1164,8 +1247,7 @@ class _EditGameScreenState extends State<EditGameScreen> {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final bgColor = isDark ? const Color(0xFF0B0A0F) : Colors.grey.shade100;
     final cardBg = isDark ? const Color(0xFF12111A) : Colors.white;
-    final borderColor =
-        isDark ? const Color(0xFF242232) : Colors.grey.shade300;
+    final borderColor = isDark ? const Color(0xFF242232) : Colors.grey.shade300;
     final textColor = isDark ? Colors.white : Colors.black87;
     final subtextColor = isDark ? Colors.white60 : Colors.black54;
 
@@ -1220,8 +1302,9 @@ class _EditGameScreenState extends State<EditGameScreen> {
                 const SizedBox(height: 20),
                 ElevatedButton.icon(
                   style: ElevatedButton.styleFrom(
-                    backgroundColor:
-                        isDark ? const Color(0xFF262433) : Colors.grey.shade200,
+                    backgroundColor: isDark
+                        ? const Color(0xFF262433)
+                        : Colors.grey.shade200,
                     foregroundColor: textColor,
                     elevation: 0,
                     padding: const EdgeInsets.symmetric(
@@ -1269,8 +1352,9 @@ class _EditGameScreenState extends State<EditGameScreen> {
                     labelText: 'Nombre del juego',
                     labelStyle: TextStyle(color: subtextColor),
                     filled: true,
-                    fillColor:
-                        isDark ? const Color(0xFF1A1826) : Colors.grey.shade100,
+                    fillColor: isDark
+                        ? const Color(0xFF1A1826)
+                        : Colors.grey.shade100,
                     enabledBorder: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(14),
                       borderSide: BorderSide(color: borderColor),
@@ -1287,15 +1371,17 @@ class _EditGameScreenState extends State<EditGameScreen> {
                 const SizedBox(height: 18),
                 DropdownButtonFormField<String>(
                   initialValue: _estadoSeleccionado,
-                  dropdownColor:
-                      isDark ? const Color(0xFF1E1C2A) : Colors.white,
+                  dropdownColor: isDark
+                      ? const Color(0xFF1E1C2A)
+                      : Colors.white,
                   style: TextStyle(color: textColor, fontSize: 15),
                   decoration: InputDecoration(
                     labelText: 'Estado en tu colección',
                     labelStyle: TextStyle(color: subtextColor),
                     filled: true,
-                    fillColor:
-                        isDark ? const Color(0xFF1A1826) : Colors.grey.shade100,
+                    fillColor: isDark
+                        ? const Color(0xFF1A1826)
+                        : Colors.grey.shade100,
                     enabledBorder: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(14),
                       borderSide: BorderSide(color: borderColor),
@@ -1343,8 +1429,9 @@ class _EditGameScreenState extends State<EditGameScreen> {
                         borderRadius: BorderRadius.circular(28),
                       ),
                     ),
-                    onPressed:
-                        _guardando ? null : () => Navigator.of(context).pop(),
+                    onPressed: _guardando
+                        ? null
+                        : () => Navigator.of(context).pop(),
                     child: const Text(
                       'Cancelar',
                       style: TextStyle(

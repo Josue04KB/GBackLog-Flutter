@@ -1,9 +1,8 @@
-import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
+
 import '../auth/auth_view_model.dart';
 import 'settings_view_model.dart';
 
@@ -15,24 +14,6 @@ class UserProfileScreen extends StatefulWidget {
 }
 
 class _UserProfileScreenState extends State<UserProfileScreen> {
-  bool _isUploading = false;
-  String? _avatarUrl;
-
-  @override
-  void initState() {
-    super.initState();
-    _cargarAvatarActual();
-  }
-
-  void _cargarAvatarActual() {
-    final user = Supabase.instance.client.auth.currentUser;
-    if (user != null && user.userMetadata != null) {
-      setState(() {
-        _avatarUrl = user.userMetadata!['avatar_url'];
-      });
-    }
-  }
-
   Future<void> _cambiarFotoPerfil() async {
     final picker = ImagePicker();
     final pickedFile = await picker.pickImage(
@@ -41,65 +22,41 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
     );
 
     if (pickedFile == null) return;
+    if (!mounted) return;
 
-    setState(() => _isUploading = true);
+    final settingsVm = context.read<SettingsViewModel>();
+    final updated = await settingsVm.actualizarAvatar(pickedFile.path);
 
-    try {
-      final supabase = Supabase.instance.client;
-      final userId = supabase.auth.currentUser!.id;
-      final file = File(pickedFile.path);
-      final fileExt = pickedFile.path.split('.').last;
-      final fileName = '$userId-${DateTime.now().millisecondsSinceEpoch}.$fileExt';
-      final filePath = 'public/$fileName';
-
-      await supabase.storage.from('avatars').upload(
-            filePath,
-            file,
-            fileOptions: const FileOptions(upsert: true),
-          );
-
-      final publicUrl = supabase.storage.from('avatars').getPublicUrl(filePath);
-
-      await supabase.auth.updateUser(
-        UserAttributes(
-          data: {'avatar_url': publicUrl},
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          updated
+              ? 'Foto de perfil actualizada con éxito'
+              : settingsVm.errorMessage ?? 'No se pudo actualizar la foto',
         ),
-      );
-
-      setState(() {
-        _avatarUrl = publicUrl;
-        _isUploading = false;
-      });
-
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('¡Foto de perfil actualizada con éxito!')),
-      );
-    } catch (e) {
-      setState(() => _isUploading = false);
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error al subir la imagen: $e')),
-      );
-    }
+      ),
+    );
   }
 
   Future<void> _eliminarCuenta(BuildContext context) async {
-    try {
-      final supabase = Supabase.instance.client;
-      await supabase.rpc('delete_user');
-      await supabase.auth.signOut();
+    final settingsVm = context.read<SettingsViewModel>();
+    final deleted = await settingsVm.eliminarCuenta();
+    if (!context.mounted) return;
 
-      if (!context.mounted) return;
+    if (deleted) {
+      context.read<AuthViewModel>().notifyProfileChanged();
       context.go('/login');
-
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Cuenta eliminada permanentemente')),
       );
-    } catch (e) {
-      if (!context.mounted) return;
+    } else {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error al eliminar cuenta: $e')),
+        SnackBar(
+          content: Text(
+            settingsVm.errorMessage ?? 'No se pudo eliminar la cuenta',
+          ),
+        ),
       );
     }
   }
@@ -108,6 +65,7 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
   Widget build(BuildContext context) {
     final settingsVm = context.watch<SettingsViewModel>();
     final authVm = context.read<AuthViewModel>();
+    final avatarUrl = settingsVm.userAvatarUrl;
     final isDark = settingsVm.isDarkMode;
 
     final bgColor = isDark ? const Color(0xFF0D0C14) : Colors.grey.shade100;
@@ -142,14 +100,18 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
                   CircleAvatar(
                     radius: 50,
                     backgroundColor: const Color(0xFF7C5CFF),
-                    backgroundImage: (_avatarUrl != null && _avatarUrl!.isNotEmpty)
-                        ? NetworkImage(_avatarUrl!)
+                    backgroundImage: (avatarUrl != null && avatarUrl.isNotEmpty)
+                        ? NetworkImage(avatarUrl)
                         : null,
-                    child: (_avatarUrl == null || _avatarUrl!.isEmpty)
-                        ? const Icon(Icons.person, size: 60, color: Colors.white)
+                    child: (avatarUrl == null || avatarUrl.isEmpty)
+                        ? const Icon(
+                            Icons.person,
+                            size: 60,
+                            color: Colors.white,
+                          )
                         : null,
                   ),
-                  if (_isUploading)
+                  if (settingsVm.isLoading)
                     const Positioned.fill(
                       child: CircularProgressIndicator(color: Colors.white),
                     ),
@@ -157,7 +119,7 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
                     bottom: 0,
                     right: 0,
                     child: InkWell(
-                      onTap: _isUploading ? null : _cambiarFotoPerfil,
+                      onTap: settingsVm.isLoading ? null : _cambiarFotoPerfil,
                       borderRadius: BorderRadius.circular(20),
                       child: Container(
                         padding: const EdgeInsets.all(8),
@@ -204,7 +166,13 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
                 borderRadius: BorderRadius.circular(16),
                 boxShadow: isDark
                     ? []
-                    : [const BoxShadow(color: Colors.black12, blurRadius: 4, offset: Offset(0, 2))],
+                    : [
+                        const BoxShadow(
+                          color: Colors.black12,
+                          blurRadius: 4,
+                          offset: Offset(0, 2),
+                        ),
+                      ],
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -220,7 +188,10 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
                   const Divider(height: 24),
                   ListTile(
                     contentPadding: EdgeInsets.zero,
-                    title: Text('Correo Electrónico (Fijo)', style: TextStyle(color: subtextColor, fontSize: 12)),
+                    title: Text(
+                      'Correo Electrónico (Fijo)',
+                      style: TextStyle(color: subtextColor, fontSize: 12),
+                    ),
                     subtitle: Text(
                       settingsVm.userEmail ?? 'correo@gpu.com',
                       style: TextStyle(
@@ -229,7 +200,11 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
                         fontWeight: FontWeight.bold,
                       ),
                     ),
-                    trailing: const Icon(Icons.lock_outline, size: 18, color: Colors.grey),
+                    trailing: const Icon(
+                      Icons.lock_outline,
+                      size: 18,
+                      color: Colors.grey,
+                    ),
                   ),
                 ],
               ),
@@ -248,7 +223,9 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
             const SizedBox(height: 12),
             ElevatedButton.icon(
               style: ElevatedButton.styleFrom(
-                backgroundColor: isDark ? const Color(0xFF282538) : Colors.white,
+                backgroundColor: isDark
+                    ? const Color(0xFF282538)
+                    : Colors.white,
                 foregroundColor: textColor,
                 elevation: isDark ? 0 : 1,
                 minimumSize: const Size(double.infinity, 50),
@@ -266,7 +243,8 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
                 foregroundColor: Colors.white,
                 minimumSize: const Size(double.infinity, 50),
               ),
-              onPressed: () => _mostrarDialogoConfirmarCerrarSesion(context, authVm, isDark),
+              onPressed: () =>
+                  _mostrarDialogoConfirmarCerrarSesion(context, authVm, isDark),
               icon: const Icon(Icons.logout),
               label: const Text('Cerrar Sesión'),
             ),
@@ -282,7 +260,8 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
                   borderRadius: BorderRadius.circular(12),
                 ),
               ),
-              onPressed: () => _mostrarDialogoConfirmarEliminar(context, isDark),
+              onPressed: () =>
+                  _mostrarDialogoConfirmarEliminar(context, isDark),
               icon: const Icon(Icons.delete_forever),
               label: const Text('Eliminar cuenta'),
             ),
@@ -300,18 +279,26 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
       context: context,
       builder: (ctx) => AlertDialog(
         backgroundColor: isDark ? const Color(0xFF1A1826) : Colors.white,
-        title: Text('Cambiar Contraseña', style: TextStyle(color: isDark ? Colors.white : Colors.black87)),
+        title: Text(
+          'Cambiar Contraseña',
+          style: TextStyle(color: isDark ? Colors.white : Colors.black87),
+        ),
         content: TextField(
           controller: passCtrl,
           obscureText: true,
           style: TextStyle(color: isDark ? Colors.white : Colors.black87),
           decoration: InputDecoration(
             labelText: 'Nueva contraseña (mín. 6 caracteres)',
-            labelStyle: TextStyle(color: isDark ? Colors.white70 : Colors.black54),
+            labelStyle: TextStyle(
+              color: isDark ? Colors.white70 : Colors.black54,
+            ),
           ),
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancelar')),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancelar'),
+          ),
           ElevatedButton(
             onPressed: () async {
               if (passCtrl.text.length < 6) return;
@@ -319,7 +306,13 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
               final ok = await settingsVm.cambiarContrasena(passCtrl.text);
               if (!context.mounted) return;
               ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(content: Text(ok ? 'Contraseña actualizada con éxito' : 'Error al actualizar')),
+                SnackBar(
+                  content: Text(
+                    ok
+                        ? 'Contraseña actualizada con éxito'
+                        : 'Error al actualizar',
+                  ),
+                ),
               );
             },
             child: const Text('Actualizar'),
@@ -390,7 +383,11 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
         backgroundColor: isDark ? const Color(0xFF1A1826) : Colors.white,
         title: Row(
           children: [
-            const Icon(Icons.warning_amber_rounded, color: Colors.redAccent, size: 28),
+            const Icon(
+              Icons.warning_amber_rounded,
+              color: Colors.redAccent,
+              size: 28,
+            ),
             const SizedBox(width: 10),
             Expanded(
               child: Text(
