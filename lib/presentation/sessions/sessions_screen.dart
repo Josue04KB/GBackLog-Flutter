@@ -9,6 +9,7 @@ import 'package:provider/provider.dart';
 import '../../domain/models/game_models.dart';
 import '../catalog/catalog_view_model.dart';
 import '../widgets/ui_state.dart';
+import 'new_session_sheet.dart';
 import 'session_view_model.dart';
 
 class SessionsScreen extends StatefulWidget {
@@ -35,6 +36,7 @@ class _SessionsScreenState extends State<SessionsScreen> {
     super.initState();
     _tituloLocal = widget.videojuegoTitulo;
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
       context.read<SessionViewModel>().cargarSesiones(
         videojuegoId: widget.filtroVideojuegoId,
       );
@@ -181,32 +183,17 @@ class _SessionsScreenState extends State<SessionsScreen> {
     );
   }
 
-  Future<void> _mostrarDialogoNuevaSesion(
-    bool isDark,
-    Videojuego? juegoActual,
-  ) async {
+  Future<void> _mostrarDialogoNuevaSesion(Videojuego? juegoActual) async {
     final sessionVm = context.read<SessionViewModel>();
     final catalogVm = context.read<CatalogViewModel>();
+    final juego =
+        juegoActual ??
+        (catalogVm.videojuegos.isNotEmpty ? catalogVm.videojuegos.first : null);
+    final juegoId = widget.filtroVideojuegoId ?? juego?.id;
+    // La selección conserva una lista estable mientras el formulario está abierto.
+    final plataformas = List<Plataforma>.unmodifiable(catalogVm.plataformas);
 
-    final int? juegoSeleccionadoId =
-        widget.filtroVideojuegoId ??
-        (catalogVm.videojuegos.isNotEmpty
-            ? catalogVm.videojuegos.first.id
-            : null);
-
-    int? plataformaSeleccionadaId;
-    if (catalogVm.plataformas.isNotEmpty) {
-      final coincidencia = catalogVm.plataformas.where(
-        (p) =>
-            p.nombre.toLowerCase() ==
-            (juegoActual?.plataforma ?? '').toLowerCase(),
-      );
-      plataformaSeleccionadaId = coincidencia.isNotEmpty
-          ? coincidencia.first.id
-          : catalogVm.plataformas.first.id;
-    }
-
-    if (juegoSeleccionadoId == null || catalogVm.plataformas.isEmpty) {
+    if (juegoId == null || plataformas.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text(
@@ -217,164 +204,45 @@ class _SessionsScreenState extends State<SessionsScreen> {
       return;
     }
 
-    final formKey = GlobalKey<FormState>();
-    final minutosCtrl = TextEditingController();
-    final notasCtrl = TextEditingController();
-    if (!catalogVm.plataformas.any(
-      (platform) => platform.id == plataformaSeleccionadaId,
-    )) {
-      plataformaSeleccionadaId = null;
-    }
-
-    await showDialog<void>(
+    final coincidencia = plataformas.where(
+      (p) => p.nombre.toLowerCase() == (juego?.plataforma ?? '').toLowerCase(),
+    );
+    final plataformaId = coincidencia.isNotEmpty
+        ? coincidencia.first.id
+        : plataformas.first.id;
+    final guardada = await showModalBottomSheet<bool>(
       context: context,
-      builder: (dialogCtx) {
-        return StatefulBuilder(
-          builder: (ctx, setDialogState) {
-            return AlertDialog(
-              backgroundColor: isDark ? const Color(0xFF1A1826) : Colors.white,
-              title: Text(
-                'Registrar Sesión',
-                style: TextStyle(color: isDark ? Colors.white : Colors.black87),
-              ),
-              content: SingleChildScrollView(
-                child: Form(
-                  key: formKey,
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      DropdownButtonFormField<int>(
-                        initialValue: plataformaSeleccionadaId,
-                        dropdownColor: isDark
-                            ? const Color(0xFF282538)
-                            : Colors.white,
-                        style: TextStyle(
-                          color: isDark ? Colors.white : Colors.black87,
-                        ),
-                        decoration: InputDecoration(
-                          labelText: 'Plataforma',
-                          labelStyle: TextStyle(
-                            color: isDark ? Colors.white70 : Colors.black54,
-                          ),
-                        ),
-                        items: catalogVm.plataformas
-                            .map(
-                              (p) => DropdownMenuItem<int>(
-                                value: p.id,
-                                child: Text(p.nombre),
-                              ),
-                            )
-                            .toList(),
-                        validator: (value) =>
-                            value == null ? 'Selecciona una plataforma' : null,
-                        onChanged: (value) {
-                          setDialogState(
-                            () => plataformaSeleccionadaId = value,
-                          );
-                        },
-                      ),
-                      const SizedBox(height: 12),
-                      TextFormField(
-                        controller: minutosCtrl,
-                        keyboardType: TextInputType.number,
-                        textInputAction: TextInputAction.next,
-                        autovalidateMode: AutovalidateMode.onUserInteraction,
-                        style: TextStyle(
-                          color: isDark ? Colors.white : Colors.black87,
-                        ),
-                        decoration: InputDecoration(
-                          labelText: 'Minutos jugados',
-                          helperText: 'Entre 1 y 1440 minutos',
-                          labelStyle: TextStyle(
-                            color: isDark ? Colors.white70 : Colors.black54,
-                          ),
-                        ),
-                        validator: (value) {
-                          final minutes = int.tryParse(value?.trim() ?? '');
-                          if (minutes == null) {
-                            return 'Ingresa una cantidad válida de minutos';
-                          }
-                          if (minutes < 1 || minutes > 1440) {
-                            return 'El tiempo debe estar entre 1 y 1440 minutos';
-                          }
-                          return null;
-                        },
-                      ),
-                      const SizedBox(height: 12),
-                      TextFormField(
-                        controller: notasCtrl,
-                        minLines: 2,
-                        maxLines: 4,
-                        textInputAction: TextInputAction.done,
-                        autovalidateMode: AutovalidateMode.onUserInteraction,
-                        style: TextStyle(
-                          color: isDark ? Colors.white : Colors.black87,
-                        ),
-                        decoration: InputDecoration(
-                          labelText: 'Notas o progreso logrado',
-                          helperText: 'Escribe al menos 5 caracteres',
-                          labelStyle: TextStyle(
-                            color: isDark ? Colors.white70 : Colors.black54,
-                          ),
-                        ),
-                        validator: (value) {
-                          if ((value?.trim().length ?? 0) < 5) {
-                            return 'Describe el progreso en al menos 5 caracteres';
-                          }
-                          return null;
-                        },
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.of(dialogCtx).pop(),
-                  child: const Text('Cancelar'),
-                ),
-                ElevatedButton(
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF7C5CFF),
-                    foregroundColor: Colors.white,
-                  ),
-                  onPressed: () async {
-                    if (!(formKey.currentState?.validate() ?? false)) return;
-
-                    final mins = int.parse(minutosCtrl.text.trim());
-                    Navigator.of(dialogCtx).pop();
-
-                    final ok = await sessionVm.registrarNuevaSesion(
-                      videojuegoId: juegoSeleccionadoId,
-                      plataformaId: plataformaSeleccionadaId,
-                      minutosJugados: mins,
-                      notas: notasCtrl.text.trim(),
-                      filtroVideojuegoIdActual: widget.filtroVideojuegoId,
-                    );
-
-                    if (!mounted) return;
-                    if (!ok) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Text(
-                            sessionVm.errorMessage ??
-                                'Error al registrar sesión',
-                          ),
-                        ),
-                      );
-                    }
-                  },
-                  child: const Text('Guardar'),
-                ),
-              ],
-            );
-          },
-        );
-      },
+      isScrollControlled: true,
+      useSafeArea: true,
+      isDismissible: false,
+      enableDrag: false,
+      backgroundColor: Colors.transparent,
+      barrierColor: Colors.black.withValues(alpha: 0.65),
+      constraints: const BoxConstraints(maxWidth: 600),
+      builder: (_) => NewSessionSheet(
+        videojuegoTitulo:
+            juego?.titulo ?? widget.videojuegoTitulo ?? 'Videojuego',
+        plataformas: plataformas,
+        plataformaInicialId: plataformaId,
+        onSave: (draft) async {
+          final ok = await sessionVm.registrarNuevaSesion(
+            videojuegoId: juegoId,
+            plataformaId: draft.plataformaId,
+            minutosJugados: draft.minutosJugados,
+            notas: draft.notas,
+            filtroVideojuegoIdActual: widget.filtroVideojuegoId,
+          );
+          return ok
+              ? null
+              : sessionVm.errorMessage ??
+                    'No se pudo guardar la sesión. Reintenta.';
+        },
+      ),
     );
 
-    minutosCtrl.dispose();
-    notasCtrl.dispose();
+    if (!mounted || guardada != true) return;
+    ScaffoldMessenger.of(context)
+        .showSnackBar(const SnackBar(content: Text('Sesión registrada')));
   }
 
   Widget _buildPosterImage(String imagePath, bool isDark) {
@@ -716,7 +584,7 @@ class _SessionsScreenState extends State<SessionsScreen> {
         foregroundColor: Colors.white,
         onPressed: sessionVm.isSubmitting
             ? null
-            : () => _mostrarDialogoNuevaSesion(isDark, juegoActual),
+            : () => _mostrarDialogoNuevaSesion(juegoActual),
         icon: const Icon(Icons.add),
         label: const Text('Registrar sesión'),
       ),
