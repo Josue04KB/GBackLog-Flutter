@@ -113,16 +113,18 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         children: [
                           Text(
                             settingsVm.username ?? 'Usuario Activo',
-                            style: TextStyle(color: subtextColor, fontSize: 13),
+                            style: TextStyle(
+                              color: textColor,
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
                           ),
                           const SizedBox(height: 4),
                           Text(
                             settingsVm.userEmail ?? 'correo@gpu.com',
-                            style: TextStyle(
-                              color: textColor,
-                              fontWeight: FontWeight.bold,
-                              fontSize: 15,
-                            ),
+                            style: TextStyle(color: subtextColor, fontSize: 13),
                             overflow: TextOverflow.ellipsis,
                           ),
                         ],
@@ -146,8 +148,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
             ),
             const SizedBox(height: 8),
             SwitchListTile(
+              secondary: const Icon(
+                Icons.brightness_6_outlined,
+                color: Color(0xFF7C5CFF),
+                size: 26,
+              ),
               title: Text(
-                'Modo Oscuro / Claro',
+                'Tema de la aplicación',
                 style: TextStyle(color: textColor),
               ),
               subtitle: Text(
