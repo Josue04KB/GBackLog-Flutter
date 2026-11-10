@@ -69,6 +69,36 @@ class SettingsViewModel extends ChangeNotifier {
     }
   }
 
+  Future<bool> editarPlataforma({
+    required int id,
+    required String nombre,
+    required String fabricante,
+    required String formato,
+  }) async {
+    if (_isLoading) return false;
+    _isLoading = true;
+    _errorMessage = null;
+    notifyListeners();
+    try {
+      await _repository.actualizarPlataforma(
+        id: id,
+        nombre: nombre,
+        fabricante: fabricante,
+        formato: formato,
+      );
+      return true;
+    } catch (error) {
+      _errorMessage = userMessage(
+        error,
+        fallback: 'No pudimos actualizar la plataforma. Inténtalo de nuevo.',
+      );
+      return false;
+    } finally {
+      _isLoading = false;
+      notifyListeners();
+    }
+  }
+
   Future<bool> cambiarContrasena(String nuevaPass) async {
     _isLoading = true;
     _errorMessage = null;

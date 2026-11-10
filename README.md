@@ -15,6 +15,9 @@ catálogo personal, agregar un videojuego y registrar una sesión de juego.
 - Registro con usuario, correo y contraseña; inicio de sesión con correo y contraseña.
 - Catálogo personal y exploración del catálogo global.
 - Configuración y consulta de plataformas maestras.
+- Creación y edición de plataformas con un formulario que conserva los datos si falla el guardado.
+  Para habilitar la edición y sincronizar los nombres en los juegos, aplica
+  [el SQL de plataformas](supabase/platform_edit.md) una vez en Supabase.
 - Registro y consulta de sesiones de juego; pulsación prolongada para editar o eliminar.
 - Perfil de usuario, cambio de contraseña y cierre de sesión.
 

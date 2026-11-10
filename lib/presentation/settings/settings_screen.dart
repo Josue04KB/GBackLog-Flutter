@@ -4,6 +4,8 @@ import 'package:provider/provider.dart';
 
 import '../catalog/catalog_view_model.dart';
 import 'settings_view_model.dart';
+import 'platform_form_sheet.dart';
+import '../../domain/models/game_models.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -176,7 +178,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   ),
                 ),
                 TextButton.icon(
-                  onPressed: () => _mostrarDialogoCrearPlataforma(
+                  onPressed: () => _mostrarFormularioPlataforma(
                     context,
                     settingsVm.isDarkMode,
                   ),
@@ -195,7 +197,18 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 margin: const EdgeInsets.only(bottom: 8),
                 elevation: settingsVm.isDarkMode ? 1 : 2,
                 child: ListTile(
-                  leading: const Icon(Icons.devices, color: Color(0xFF7C5CFF)),
+                  leading: IconButton(
+                    tooltip: 'Editar ${p.nombre}',
+                    icon: const Icon(
+                      Icons.edit_outlined,
+                      color: Color(0xFF7C5CFF),
+                    ),
+                    onPressed: () => _mostrarFormularioPlataforma(
+                      context,
+                      settingsVm.isDarkMode,
+                      plataforma: p,
+                    ),
+                  ),
                   title: Text(
                     p.nombre,
                     style: TextStyle(
@@ -308,145 +321,66 @@ class _SettingsScreenState extends State<SettingsScreen> {
     }
   }
 
-  Future<void> _mostrarDialogoCrearPlataforma(
+  Future<void> _mostrarFormularioPlataforma(
     BuildContext context,
-    bool isDark,
-  ) async {
-    final formKey = GlobalKey<FormState>();
-    final nombreCtrl = TextEditingController();
-    final fabCtrl = TextEditingController();
-    final formatoCtrl = TextEditingController();
+    bool isDark, {
+    Plataforma? plataforma,
+  }) async {
     final settingsVm = context.read<SettingsViewModel>();
     final catalogVm = context.read<CatalogViewModel>();
-
-    final draft =
-        await showDialog<({String nombre, String fabricante, String formato})>(
-          context: context,
-          builder: (ctx) => AlertDialog(
-            backgroundColor: isDark ? const Color(0xFF1A1826) : Colors.white,
-            title: Text(
-              'Nueva Plataforma',
-              style: TextStyle(color: isDark ? Colors.white : Colors.black87),
-            ),
-            content: SingleChildScrollView(
-              child: Form(
-                key: formKey,
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    TextFormField(
-                      controller: nombreCtrl,
-                      textInputAction: TextInputAction.next,
-                      autovalidateMode: AutovalidateMode.onUserInteraction,
-                      style: TextStyle(
-                        color: isDark ? Colors.white : Colors.black87,
-                      ),
-                      decoration: InputDecoration(
-                        labelText: 'Nombre (ej. Xbox Series X)',
-                        labelStyle: TextStyle(
-                          color: isDark ? Colors.white70 : Colors.black54,
-                        ),
-                      ),
-                      validator: (value) {
-                        if ((value?.trim().length ?? 0) < 2) {
-                          return 'Ingresa un nombre de al menos 2 caracteres';
-                        }
-                        return null;
-                      },
-                    ),
-                    TextFormField(
-                      controller: fabCtrl,
-                      textInputAction: TextInputAction.next,
-                      autovalidateMode: AutovalidateMode.onUserInteraction,
-                      style: TextStyle(
-                        color: isDark ? Colors.white : Colors.black87,
-                      ),
-                      decoration: InputDecoration(
-                        labelText: 'Fabricante (ej. Microsoft)',
-                        labelStyle: TextStyle(
-                          color: isDark ? Colors.white70 : Colors.black54,
-                        ),
-                      ),
-                      validator: (value) {
-                        if ((value?.trim().length ?? 0) < 2) {
-                          return 'Ingresa el fabricante';
-                        }
-                        return null;
-                      },
-                    ),
-                    TextFormField(
-                      controller: formatoCtrl,
-                      textInputAction: TextInputAction.done,
-                      autovalidateMode: AutovalidateMode.onUserInteraction,
-                      style: TextStyle(
-                        color: isDark ? Colors.white : Colors.black87,
-                      ),
-                      decoration: InputDecoration(
-                        labelText: 'Formato (ej. Digital)',
-                        labelStyle: TextStyle(
-                          color: isDark ? Colors.white70 : Colors.black54,
-                        ),
-                      ),
-                      validator: (value) {
-                        if ((value?.trim().length ?? 0) < 2) {
-                          return 'Ingresa el formato';
-                        }
-                        return null;
-                      },
-                    ),
-                  ],
-                ),
-              ),
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(ctx),
-                child: const Text('Cancelar'),
-              ),
-              ElevatedButton(
-                onPressed: () {
-                  if (!(formKey.currentState?.validate() ?? false)) return;
-                  Navigator.pop(ctx, (
-                    nombre: nombreCtrl.text.trim(),
-                    fabricante: fabCtrl.text.trim(),
-                    formato: formatoCtrl.text.trim(),
-                  ));
-                },
-                child: const Text('Guardar'),
-              ),
-            ],
+    final saved = await showModalBottomSheet<bool>(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      isDismissible: false,
+      enableDrag: false,
+      backgroundColor: Colors.transparent,
+      constraints: const BoxConstraints(maxWidth: 560),
+      builder: (_) => Theme(
+        data: ThemeData(
+          brightness: isDark ? Brightness.dark : Brightness.light,
+          colorScheme: ColorScheme.fromSeed(
+            seedColor: const Color(0xFF7C5CFF),
+            brightness: isDark ? Brightness.dark : Brightness.light,
           ),
-        );
-
-    await Future<void>.delayed(kThemeAnimationDuration);
-    nombreCtrl.dispose();
-    fabCtrl.dispose();
-    formatoCtrl.dispose();
-
-    if (draft == null || !mounted) return;
-
-    final creada = await settingsVm.agregarPlataforma(
-      nombre: draft.nombre,
-      fabricante: draft.fabricante,
-      formato: draft.formato,
-    );
-    if (!mounted) return;
-
-    if (creada) {
-      await catalogVm.cargarMaestros();
-      if (!mounted) return;
-      ScaffoldMessenger.of(this.context).showSnackBar(
-        SnackBar(content: Text('Plataforma "${draft.nombre}" creada')),
-      );
-    } else {
-      ScaffoldMessenger.of(this.context).showSnackBar(
-        SnackBar(
-          content: Text(
-            settingsVm.errorMessage ??
-                'No se pudo crear la plataforma. Reintenta.',
-          ),
+          useMaterial3: true,
         ),
-      );
-    }
+        child: PlatformFormSheet(
+          initial: plataforma,
+          onSave: (draft) async {
+            final ok = plataforma == null
+                ? await settingsVm.agregarPlataforma(
+                    nombre: draft.nombre,
+                    fabricante: draft.fabricante,
+                    formato: draft.formato,
+                  )
+                : await settingsVm.editarPlataforma(
+                    id: plataforma.id,
+                    nombre: draft.nombre,
+                    fabricante: draft.fabricante,
+                    formato: draft.formato,
+                  );
+            return ok
+                ? null
+                : settingsVm.errorMessage ??
+                      'No pudimos guardar la plataforma. Inténtalo de nuevo.';
+          },
+        ),
+      ),
+    );
+    if (saved != true || !mounted) return;
+    final refreshed = await catalogVm.cargarMaestros();
+    if (!mounted) return;
+    ScaffoldMessenger.of(this.context).showSnackBar(
+      SnackBar(
+        content: Text(
+          refreshed
+              ? plataforma == null
+                    ? 'Plataforma creada'
+                    : 'Plataforma actualizada'
+              : 'Plataforma guardada. No pudimos actualizar la lista. Vuelve a abrir Configuración.',
+        ),
+      ),
+    );
   }
 }

@@ -313,6 +313,54 @@ class SupabaseRemoteService {
     }
   }
 
+  Future<JsonMap> updatePlataforma(
+    int id, {
+    required String nombre,
+    required String fabricante,
+    required String formato,
+  }) async {
+    if (currentUser == null) {
+      throw const AppException('Vuelve a iniciar sesión para continuar.');
+    }
+    try {
+      // El servidor renombra también los juegos en una sola transacción.
+      final result = await _client.rpc(
+        'editar_plataforma',
+        params: {
+          'p_id': id,
+          'p_nombre': nombre,
+          'p_fabricante': fabricante,
+          'p_formato': formato,
+        },
+      );
+      if (result is! Map<String, dynamic> || result['id'] != id) {
+        throw const AppException(
+          'No pudimos confirmar los cambios. Actualiza la lista antes de volver a intentarlo.',
+        );
+      }
+      return result;
+    } on PostgrestException catch (error) {
+      if (error.code == 'PGRST202' || error.code == '42883') {
+        throw const AppException(
+          'La edición de plataformas todavía no está disponible. Contacta al administrador.',
+        );
+      }
+      throw AppException(
+        userMessage(
+          error,
+          fallback: 'No pudimos actualizar la plataforma. Inténtalo de nuevo.',
+        ),
+      );
+    } catch (error) {
+      throw AppException(
+        userMessage(
+          error,
+          fallback: 'No pudimos actualizar la plataforma. Inténtalo de nuevo.',
+        ),
+      );
+    }
+  }
+
   Future<String> uploadImage({
     required String localPath,
     required String prefix,

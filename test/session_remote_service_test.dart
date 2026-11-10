@@ -353,4 +353,107 @@ void main() {
     await expectLater(repository.eliminarSesion(17), throwsA(isA<Exception>()));
     expect(requests, isEmpty);
   });
+
+  test(
+    'editar plataforma usa una sola RPC con el id y los datos limpios',
+    () async {
+      responseBody = {
+        'id': 4,
+        'nombre': 'Switch OLED',
+        'fabricante': 'Nintendo',
+        'formato_default': 'Cartucho',
+        'user_id': 'test-user',
+      };
+      final updated = await repository.actualizarPlataforma(
+        id: 4,
+        nombre: ' Switch OLED ',
+        fabricante: ' Nintendo ',
+        formato: ' Cartucho ',
+      );
+      expect(requests.single.uri.path, '/rest/v1/rpc/editar_plataforma');
+      expect(jsonDecode(requests.single.body), {
+        'p_id': 4,
+        'p_nombre': 'Switch OLED',
+        'p_fabricante': 'Nintendo',
+        'p_formato': 'Cartucho',
+      });
+      expect(updated.id, 4);
+      expect(updated.nombre, 'Switch OLED');
+      expect(updated.userId, 'test-user');
+    },
+  );
+
+  test('editar plataforma requiere datos válidos y autenticación', () async {
+    await expectLater(
+      repository.actualizarPlataforma(
+        id: 4,
+        nombre: ' ',
+        fabricante: 'Nintendo',
+        formato: 'Digital',
+      ),
+      throwsA(isA<Exception>()),
+    );
+    remote.authenticated = false;
+    await expectLater(
+      repository.actualizarPlataforma(
+        id: 4,
+        nombre: 'Switch',
+        fabricante: 'Nintendo',
+        formato: 'Digital',
+      ),
+      throwsA(isA<Exception>()),
+    );
+    expect(requests, isEmpty);
+  });
+
+  for (final failure in [
+    ('PGRST202', 'todavía no está disponible'),
+    ('42501', 'No tienes permiso'),
+    ('23505', 'Ya existe un registro'),
+  ]) {
+    test(
+      'editar plataforma traduce ${failure.$1} y no confirma éxito',
+      () async {
+        responseStatus = 400;
+        responseBody = {
+          'code': failure.$1,
+          'message': 'private server details',
+        };
+        await expectLater(
+          repository.actualizarPlataforma(
+            id: 4,
+            nombre: 'Switch',
+            fabricante: 'Nintendo',
+            formato: 'Digital',
+          ),
+          throwsA(
+            isA<Exception>().having(
+              (e) => e.toString(),
+              'mensaje',
+              contains(failure.$2),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  test('RPC sin fila confirmada no anuncia guardado', () async {
+    responseBody = {};
+    await expectLater(
+      repository.actualizarPlataforma(
+        id: 4,
+        nombre: 'Switch',
+        fabricante: 'Nintendo',
+        formato: 'Digital',
+      ),
+      throwsA(
+        isA<Exception>().having(
+          (e) => e.toString(),
+          'mensaje',
+          contains('confirmar los cambios'),
+        ),
+      ),
+    );
+  });
 }

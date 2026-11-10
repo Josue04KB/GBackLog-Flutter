@@ -54,6 +54,12 @@ abstract class GameRepository {
     required String formato,
   });
   Future<void> eliminarPlataforma(int id);
+  Future<Plataforma> actualizarPlataforma({
+    required int id,
+    required String nombre,
+    required String fabricante,
+    required String formato,
+  });
   Future<void> actualizarContrasena(String nuevaContrasena);
   Future<String> subirImagen({
     required String rutaLocal,

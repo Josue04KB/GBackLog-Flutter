@@ -2,6 +2,7 @@ import '../../core/errors/app_exception.dart';
 import '../../domain/models/game_models.dart';
 import '../../domain/repositories/game_repository.dart';
 import '../../domain/use_cases/validar_usuario.dart';
+import '../../domain/use_cases/validar_plataforma.dart';
 import '../services/supabase_remote_service.dart';
 
 class GameRepositoryImpl implements GameRepository {
@@ -54,6 +55,7 @@ class GameRepositoryImpl implements GameRepository {
     required String fabricante,
     required String formato,
   }) async {
+    validarPlataforma(nombre, fabricante, formato);
     final userId = _remoteService.currentUser?.id;
     if (userId == null) {
       throw AppException('Vuelve a iniciar sesión para continuar.');
@@ -69,6 +71,23 @@ class GameRepositoryImpl implements GameRepository {
   @override
   Future<void> eliminarPlataforma(int id) async {
     await _remoteService.deletePlataforma(id);
+  }
+
+  @override
+  Future<Plataforma> actualizarPlataforma({
+    required int id,
+    required String nombre,
+    required String fabricante,
+    required String formato,
+  }) async {
+    validarPlataforma(nombre, fabricante, formato);
+    final updated = await _remoteService.updatePlataforma(
+      id,
+      nombre: nombre.trim(),
+      fabricante: fabricante.trim(),
+      formato: formato.trim(),
+    );
+    return Plataforma.fromJson(updated);
   }
 
   @override
