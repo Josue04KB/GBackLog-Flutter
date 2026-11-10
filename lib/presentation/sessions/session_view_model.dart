@@ -1,3 +1,5 @@
+import '../../core/errors/error_messages.dart';
+
 import 'package:flutter/foundation.dart';
 
 import '../../domain/models/game_models.dart';
@@ -35,7 +37,10 @@ class SessionViewModel extends ChangeNotifier {
         _state = ViewState.success;
       }
     } catch (e) {
-      _errorMessage = e.toString().replaceFirst('Exception: ', '');
+      _errorMessage = userMessage(
+        e,
+        fallback: 'No pudimos cargar las sesiones. Inténtalo de nuevo.',
+      );
       _state = ViewState.error;
     }
     notifyListeners();
@@ -65,7 +70,10 @@ class SessionViewModel extends ChangeNotifier {
       return true;
     } catch (e) {
       _isSubmitting = false;
-      _errorMessage = e.toString().replaceFirst('Exception: ', '');
+      _errorMessage = userMessage(
+        e,
+        fallback: 'No pudimos guardar la sesión. Inténtalo de nuevo.',
+      );
       notifyListeners();
       return false;
     }
@@ -102,7 +110,11 @@ class SessionViewModel extends ChangeNotifier {
       _state = _sesiones.isEmpty ? ViewState.empty : ViewState.success;
       return true;
     } catch (e) {
-      _errorMessage = e.toString().replaceFirst('Exception: ', '');
+      _errorMessage = userMessage(
+        e,
+        fallback:
+            'No pudimos guardar los cambios de la sesión. Inténtalo de nuevo.',
+      );
       return false;
     } finally {
       _isSubmitting = false;

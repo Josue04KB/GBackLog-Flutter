@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../../core/errors/error_messages.dart';
+
 import '../../domain/models/game_models.dart';
 
 class SessionDraft {
@@ -71,8 +73,11 @@ class _NewSessionSheetState extends State<NewSessionSheet> {
     String? error;
     try {
       error = await widget.onSave(draft);
-    } catch (_) {
-      error = 'No se pudo guardar la sesión. Revisa tu conexión y reintenta.';
+    } catch (failure) {
+      error = userMessage(
+        failure,
+        fallback: 'No pudimos guardar la sesión. Inténtalo de nuevo.',
+      );
     }
     if (!mounted) return;
     if (error == null) {

@@ -1,3 +1,5 @@
+import 'package:gamebacklog_cloud/core/errors/app_exception.dart';
+
 import 'dart:async';
 
 import 'package:flutter/material.dart';
@@ -7,6 +9,7 @@ import 'package:gamebacklog_cloud/presentation/auth/auth_screen.dart';
 import 'package:gamebacklog_cloud/presentation/auth/auth_view_model.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 class _RegistrationRepository implements GameRepository {
   bool authenticated = false;
@@ -17,6 +20,13 @@ class _RegistrationRepository implements GameRepository {
   String? sentEmail;
   String? sentPassword;
   Completer<void>? pending;
+  Object? loginError;
+
+  @override
+  Future<void> signIn({required String email, required String password}) async {
+    if (loginError != null) throw loginError!;
+    authenticated = true;
+  }
 
   @override
   bool get hasValidSession => authenticated;
@@ -33,7 +43,7 @@ class _RegistrationRepository implements GameRepository {
     sentPassword = password;
     if (pending != null) await pending!.future;
     if (fail) {
-      throw Exception(
+      throw AppException(
         'No se pudo crear la cuenta. Prueba con otro nombre de usuario.',
       );
     }
@@ -108,6 +118,44 @@ Future<void> _fill(
 }
 
 void main() {
+  testWidgets(
+    'login sin internet muestra un aviso claro y permite reintentar',
+    (tester) async {
+      final repo = _RegistrationRepository()
+        ..loginError = const AuthException(
+          'ClientException with SocketException: Failed host lookup: private.supabase.co, uri=https://private.supabase.co/auth/v1/token',
+        );
+      final router = await _start(tester, repo, register: false);
+      await tester.enterText(
+        find.widgetWithText(TextFormField, 'Correo electrónico'),
+        'josue@example.com',
+      );
+      await tester.enterText(
+        find.widgetWithText(TextFormField, 'Contraseña'),
+        'Password123!',
+      );
+      final submit = find.widgetWithText(ElevatedButton, 'Iniciar Sesión');
+      await tester.ensureVisible(submit);
+      await tester.tap(submit);
+      await tester.pumpAndSettle();
+      expect(
+        find.text(
+          'No pudimos conectarnos. Revisa tu conexión a internet e inténtalo de nuevo.',
+        ),
+        findsOneWidget,
+      );
+      expect(find.textContaining('SocketException'), findsNothing);
+      expect(find.textContaining('supabase.co'), findsNothing);
+      expect(router.routeInformationProvider.value.uri.path, '/login');
+      expect(find.text('josue@example.com'), findsOneWidget);
+      repo.loginError = null;
+      await tester.tap(submit);
+      await tester.pumpAndSettle();
+      expect(router.routeInformationProvider.value.uri.path, '/catalogo');
+      expect(tester.takeException(), isNull);
+    },
+  );
+
   testWidgets(
     'registro exige usuario y valida formato antes de llamar al servidor',
     (tester) async {

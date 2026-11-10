@@ -1,3 +1,5 @@
+import '../../core/errors/error_messages.dart';
+
 import 'package:flutter/foundation.dart';
 
 import '../../domain/models/game_models.dart';
@@ -56,7 +58,10 @@ class CatalogViewModel extends ChangeNotifier {
       notifyListeners();
       return true;
     } catch (error) {
-      _errorMessage = _messageFrom(error);
+      _errorMessage = userMessage(
+        error,
+        fallback: 'No pudimos cargar tu colección. Inténtalo de nuevo.',
+      );
       _state = ViewState.error;
       notifyListeners();
       return false;
@@ -76,7 +81,10 @@ class CatalogViewModel extends ChangeNotifier {
       notifyListeners();
       return true;
     } catch (error) {
-      _catalogoGlobalErrorMessage = _messageFrom(error);
+      _catalogoGlobalErrorMessage = userMessage(
+        error,
+        fallback: 'No pudimos cargar el catálogo. Inténtalo de nuevo.',
+      );
       _catalogoGlobalState = ViewState.error;
       notifyListeners();
       return false;
@@ -103,7 +111,10 @@ class CatalogViewModel extends ChangeNotifier {
       );
       return await cargarMaestros();
     } catch (error) {
-      _errorMessage = _messageFrom(error);
+      _errorMessage = userMessage(
+        error,
+        fallback: 'No pudimos guardar el juego. Inténtalo de nuevo.',
+      );
       notifyListeners();
       return false;
     }
@@ -145,7 +156,10 @@ class CatalogViewModel extends ChangeNotifier {
       notifyListeners();
       return true;
     } catch (error) {
-      _errorMessage = _messageFrom(error);
+      _errorMessage = userMessage(
+        error,
+        fallback: 'No pudimos actualizar el juego. Inténtalo de nuevo.',
+      );
       notifyListeners();
       return false;
     }
@@ -161,7 +175,10 @@ class CatalogViewModel extends ChangeNotifier {
         prefijo: 'cover',
       );
     } catch (error) {
-      _errorMessage = _messageFrom(error);
+      _errorMessage = userMessage(
+        error,
+        fallback: 'No pudimos subir la imagen. Inténtalo de nuevo.',
+      );
       notifyListeners();
       return null;
     }
@@ -178,13 +195,13 @@ class CatalogViewModel extends ChangeNotifier {
       notifyListeners();
       return true;
     } catch (error) {
-      _errorMessage = _messageFrom(error);
+      _errorMessage = userMessage(
+        error,
+        fallback: 'No pudimos eliminar el juego. Inténtalo de nuevo.',
+        operation: ErrorOperation.deleteGame,
+      );
       notifyListeners();
       return false;
     }
-  }
-
-  String _messageFrom(Object error) {
-    return error.toString().replaceFirst('Exception: ', '');
   }
 }

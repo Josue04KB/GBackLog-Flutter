@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../../core/errors/error_messages.dart';
+
 class DeleteSessionDialog extends StatefulWidget {
   const DeleteSessionDialog({
     super.key,
@@ -27,8 +29,11 @@ class _DeleteSessionDialogState extends State<DeleteSessionDialog> {
     String? error;
     try {
       error = await widget.onDelete();
-    } catch (_) {
-      error = 'No se pudo eliminar la sesión. Reintenta.';
+    } catch (failure) {
+      error = userMessage(
+        failure,
+        fallback: 'No pudimos eliminar la sesión. Inténtalo de nuevo.',
+      );
     }
     if (!mounted) return;
     if (error == null) {

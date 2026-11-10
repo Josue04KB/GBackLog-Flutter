@@ -43,6 +43,13 @@ imágenes. El inicio de sesión, registro y cierre de sesión usan el SDK oficia
 de Supabase. La aplicación no guarda datos de negocio para funcionar sin
 conexión.
 
+Los errores se traducen a mensajes en español desde
+`lib/core/errors/error_messages.dart`: conexión, credenciales, sesión vencida,
+permisos y fallos al guardar. Los errores desconocidos usan un mensaje local
+según la acción; nunca se muestra la respuesta técnica del servidor.
+`AppException` se reserva para validaciones y mensajes redactados por la app.
+Este cambio no requiere modificar Supabase.
+
 Antes de una demostración se debe comprobar que las políticas RLS de Supabase
 permitan a cada usuario acceder únicamente a los registros que le corresponden.
 No se deben subir contraseñas, claves de servicio ni cuentas de demostración al

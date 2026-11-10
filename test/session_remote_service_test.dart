@@ -129,6 +129,68 @@ void main() {
     expect(requests, isEmpty);
   });
 
+  test(
+    'login traduce el rechazo real del SDK sin exponer el servidor',
+    () async {
+      responseStatus = 400;
+      responseBody = {
+        'code': 'invalid_credentials',
+        'msg': 'Invalid login credentials',
+      };
+      await expectLater(
+        repository.signIn(email: 'test@example.com', password: 'secret'),
+        throwsA(
+          isA<Exception>().having(
+            (e) => e.toString(),
+            'mensaje',
+            'El correo o la contraseña son incorrectos. Revisa tus datos.',
+          ),
+        ),
+      );
+    },
+  );
+
+  test(
+    'fallo desconocido de base de datos no revela SQL ni detalles',
+    () async {
+      responseStatus = 400;
+      responseBody = {
+        'code': '42703',
+        'message': 'column secret_schema.internal does not exist',
+        'details': 'private record',
+        'hint': 'SQL SELECT',
+      };
+      await expectLater(
+        repository.getVideojuegos(),
+        throwsA(
+          isA<Exception>().having(
+            (e) => e.toString(),
+            'mensaje',
+            'No pudimos cargar tu colección. Inténtalo de nuevo.',
+          ),
+        ),
+      );
+    },
+  );
+
+  for (final entity in ['juego', 'plataforma']) {
+    test('eliminar $entity sin fila confirmada no anuncia éxito', () async {
+      await expectLater(
+        entity == 'juego'
+            ? repository.eliminarVideojuego(7)
+            : repository.eliminarPlataforma(4),
+        throwsA(
+          isA<Exception>().having(
+            (e) => e.toString(),
+            'mensaje',
+            contains('no tienes permiso'),
+          ),
+        ),
+      );
+      expect(requests.single.uri.queryParameters['select'], 'id');
+    });
+  }
+
   test('rechazo del trigger no se presenta como registro exitoso', () async {
     responseStatus = 500;
     responseBody = {
@@ -279,7 +341,7 @@ void main() {
         isA<Exception>().having(
           (e) => e.toString(),
           'mensaje',
-          contains('Revisa los permisos'),
+          contains('No tienes permiso'),
         ),
       ),
     );

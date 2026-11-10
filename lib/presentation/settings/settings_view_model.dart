@@ -1,3 +1,5 @@
+import '../../core/errors/error_messages.dart';
+
 import 'package:flutter/foundation.dart';
 
 import '../../domain/repositories/game_repository.dart';
@@ -42,7 +44,10 @@ class SettingsViewModel extends ChangeNotifier {
       return true;
     } catch (e) {
       _isLoading = false;
-      _errorMessage = e.toString().replaceFirst('Exception: ', '');
+      _errorMessage = userMessage(
+        e,
+        fallback: 'No pudimos crear la plataforma. Inténtalo de nuevo.',
+      );
       notifyListeners();
       return false;
     }
@@ -54,7 +59,11 @@ class SettingsViewModel extends ChangeNotifier {
       notifyListeners();
       return true;
     } catch (e) {
-      _errorMessage = e.toString().replaceFirst('Exception: ', '');
+      _errorMessage = userMessage(
+        e,
+        fallback: 'No pudimos eliminar la plataforma. Inténtalo de nuevo.',
+        operation: ErrorOperation.deletePlatform,
+      );
       notifyListeners();
       return false;
     }
@@ -71,7 +80,10 @@ class SettingsViewModel extends ChangeNotifier {
       return true;
     } catch (e) {
       _isLoading = false;
-      _errorMessage = e.toString().replaceFirst('Exception: ', '');
+      _errorMessage = userMessage(
+        e,
+        fallback: 'No pudimos cambiar la contraseña. Inténtalo de nuevo.',
+      );
       notifyListeners();
       return false;
     }
@@ -93,7 +105,11 @@ class SettingsViewModel extends ChangeNotifier {
       return true;
     } catch (e) {
       _isLoading = false;
-      _errorMessage = e.toString().replaceFirst('Exception: ', '');
+      _errorMessage = userMessage(
+        e,
+        fallback:
+            'No pudimos actualizar la foto de perfil. Inténtalo de nuevo.',
+      );
       notifyListeners();
       return false;
     }
@@ -111,7 +127,10 @@ class SettingsViewModel extends ChangeNotifier {
       return true;
     } catch (e) {
       _isLoading = false;
-      _errorMessage = e.toString().replaceFirst('Exception: ', '');
+      _errorMessage = userMessage(
+        e,
+        fallback: 'No pudimos eliminar la cuenta. Inténtalo de nuevo.',
+      );
       notifyListeners();
       return false;
     }

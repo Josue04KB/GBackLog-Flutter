@@ -2,6 +2,9 @@ import 'dart:io';
 
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../../core/errors/app_exception.dart';
+import '../../core/errors/error_messages.dart';
+
 typedef JsonMap = Map<String, dynamic>;
 typedef JsonList = List<JsonMap>;
 
@@ -31,14 +34,13 @@ class SupabaseRemoteService {
   Future<void> signIn(String email, String password) async {
     try {
       await _client.auth.signInWithPassword(email: email, password: password);
-    } on AuthException catch (e) {
-      throw Exception('Error de autenticación: ${e.message}');
-    } on SocketException {
-      throw Exception(
-        'Sin conexión a internet. Verifica tu red e intenta de nuevo.',
+    } catch (error) {
+      throw AppException(
+        userMessage(
+          error,
+          fallback: 'No pudimos iniciar sesión. Inténtalo de nuevo.',
+        ),
       );
-    } catch (e) {
-      throw Exception('Fallo de red al iniciar sesión. Reintenta.');
     }
   }
 
@@ -49,27 +51,27 @@ class SupabaseRemoteService {
         password: password,
         data: {'username': username},
       );
-    } on AuthException catch (e) {
-      if (e.message.toLowerCase().contains('database error saving new user')) {
-        throw Exception(
-          'No se pudo crear la cuenta. Prueba con otro nombre de usuario. Si el problema continúa, contacta al administrador.',
-        );
-      }
-      throw Exception('No se pudo registrar la cuenta: ${e.message}');
-    } on SocketException {
-      throw Exception(
-        'Sin conexión a internet. Verifica tu red e intenta de nuevo.',
+    } catch (error) {
+      throw AppException(
+        userMessage(
+          error,
+          fallback: 'No pudimos crear la cuenta. Inténtalo de nuevo.',
+          operation: ErrorOperation.signUp,
+        ),
       );
-    } catch (e) {
-      throw Exception('Fallo de red al registrar usuario. Reintenta.');
     }
   }
 
   Future<void> signOut() async {
     try {
       await _client.auth.signOut();
-    } catch (e) {
-      throw Exception('Error al cerrar la sesión.');
+    } catch (error) {
+      throw AppException(
+        userMessage(
+          error,
+          fallback: 'No pudimos cerrar sesión. Inténtalo de nuevo.',
+        ),
+      );
     }
   }
 
@@ -80,12 +82,13 @@ class SupabaseRemoteService {
           .select()
           .order('id', ascending: true);
       return response;
-    } on SocketException {
-      throw Exception(
-        'No hay conexión a internet para cargar las plataformas.',
+    } catch (error) {
+      throw AppException(
+        userMessage(
+          error,
+          fallback: 'No pudimos cargar las plataformas. Inténtalo de nuevo.',
+        ),
       );
-    } catch (e) {
-      throw Exception('Error de red al consultar plataformas: $e');
     }
   }
 
@@ -93,7 +96,7 @@ class SupabaseRemoteService {
     try {
       final userId = currentUser?.id;
       if (userId == null) {
-        throw Exception('Usuario no autenticado');
+        throw const AppException('Vuelve a iniciar sesión para continuar.');
       }
 
       final response = await _client
@@ -102,10 +105,13 @@ class SupabaseRemoteService {
           .eq('user_id', userId)
           .order('creado_en', ascending: false);
       return response;
-    } on SocketException {
-      throw Exception('No hay conexión a internet para cargar el catálogo.');
-    } catch (e) {
-      throw Exception('Error de red al consultar videojuegos: $e');
+    } catch (error) {
+      throw AppException(
+        userMessage(
+          error,
+          fallback: 'No pudimos cargar tu colección. Inténtalo de nuevo.',
+        ),
+      );
     }
   }
 
@@ -116,30 +122,49 @@ class SupabaseRemoteService {
           .select()
           .order('titulo', ascending: true);
       return response;
-    } on SocketException {
-      throw Exception('No hay conexión a internet para cargar el catálogo.');
-    } catch (e) {
-      throw Exception('Error de red al consultar el catálogo: $e');
+    } catch (error) {
+      throw AppException(
+        userMessage(
+          error,
+          fallback: 'No pudimos cargar el catálogo. Inténtalo de nuevo.',
+        ),
+      );
     }
   }
 
   Future<void> insertVideojuego(JsonMap data) async {
     try {
       await _client.from('videojuegos').insert(data);
-    } on SocketException {
-      throw Exception('Sin conexión. No se pudo guardar el videojuego.');
-    } catch (e) {
-      throw Exception('Error al registrar videojuego en la nube: $e');
+    } catch (error) {
+      throw AppException(
+        userMessage(
+          error,
+          fallback: 'No pudimos guardar el juego. Inténtalo de nuevo.',
+        ),
+      );
     }
   }
 
   Future<void> deleteVideojuego(int id) async {
     try {
-      await _client.from('videojuegos').delete().eq('id', id);
-    } on SocketException {
-      throw Exception('Sin conexión. No se pudo eliminar el videojuego.');
-    } catch (e) {
-      throw Exception('Error al eliminar videojuego: $e');
+      final deleted = await _client
+          .from('videojuegos')
+          .delete()
+          .eq('id', id)
+          .select('id');
+      if (deleted.isEmpty) {
+        throw const AppException(
+          'El juego ya no existe o no tienes permiso para eliminarlo.',
+        );
+      }
+    } catch (error) {
+      throw AppException(
+        userMessage(
+          error,
+          fallback: 'No pudimos eliminar el juego. Inténtalo de nuevo.',
+          operation: ErrorOperation.deleteGame,
+        ),
+      );
     }
   }
 
@@ -151,14 +176,17 @@ class SupabaseRemoteService {
           .eq('id', id)
           .select('id');
       if (updated.isEmpty) {
-        throw Exception(
+        throw const AppException(
           'El juego ya no existe o no tienes permiso para editarlo.',
         );
       }
-    } on SocketException {
-      throw Exception('Sin conexión. No se pudo actualizar el videojuego.');
-    } catch (e) {
-      throw Exception('Error al actualizar videojuego: $e');
+    } catch (error) {
+      throw AppException(
+        userMessage(
+          error,
+          fallback: 'No pudimos actualizar el juego. Inténtalo de nuevo.',
+        ),
+      );
     }
   }
 
@@ -174,25 +202,33 @@ class SupabaseRemoteService {
 
       final response = await query.order('fecha', ascending: false);
       return response;
-    } on SocketException {
-      throw Exception('Sin conexión a internet para consultar las sesiones.');
-    } catch (e) {
-      throw Exception('Error de red al cargar sesiones de juego: $e');
+    } catch (error) {
+      throw AppException(
+        userMessage(
+          error,
+          fallback: 'No pudimos cargar las sesiones. Inténtalo de nuevo.',
+        ),
+      );
     }
   }
 
   Future<void> insertSesion(JsonMap data) async {
     try {
       await _client.from('sesiones_juego').insert(data);
-    } on SocketException {
-      throw Exception('Sin conexión. La sesión de juego no se pudo registrar.');
-    } catch (e) {
-      throw Exception('Error al registrar la transacción en el servidor: $e');
+    } catch (error) {
+      throw AppException(
+        userMessage(
+          error,
+          fallback: 'No pudimos guardar la sesión. Inténtalo de nuevo.',
+        ),
+      );
     }
   }
 
   Future<JsonMap> updateSesion(int id, JsonMap data) async {
-    if (currentUser == null) throw Exception('Usuario no autenticado');
+    if (currentUser == null) {
+      throw const AppException('Vuelve a iniciar sesión para continuar.');
+    }
     try {
       final updated = await _client
           .from('sesiones_juego')
@@ -200,22 +236,25 @@ class SupabaseRemoteService {
           .eq('id', id)
           .select('*, videojuegos(titulo), plataformas(nombre)');
       if (updated.isEmpty) {
-        throw Exception(
+        throw const AppException(
           'La sesión ya no existe o no tienes permiso para editarla.',
         );
       }
       return updated.single;
-    } on SocketException {
-      throw Exception('Sin conexión. No se pudo actualizar la sesión.');
-    } on PostgrestException {
-      throw Exception(
-        'No se pudo actualizar la sesión. Revisa los permisos de tu cuenta e intenta de nuevo.',
+    } catch (error) {
+      throw AppException(
+        userMessage(
+          error,
+          fallback: 'No pudimos actualizar la sesión. Inténtalo de nuevo.',
+        ),
       );
     }
   }
 
   Future<void> deleteSesion(int id) async {
-    if (currentUser == null) throw Exception('Usuario no autenticado');
+    if (currentUser == null) {
+      throw const AppException('Vuelve a iniciar sesión para continuar.');
+    }
     try {
       final deleted = await _client
           .from('sesiones_juego')
@@ -223,15 +262,16 @@ class SupabaseRemoteService {
           .eq('id', id)
           .select('id');
       if (deleted.isEmpty) {
-        throw Exception(
+        throw const AppException(
           'La sesión ya no existe o no tienes permiso para eliminarla.',
         );
       }
-    } on SocketException {
-      throw Exception('Sin conexión. No se pudo eliminar la sesión.');
-    } on PostgrestException {
-      throw Exception(
-        'No se pudo eliminar la sesión. Revisa los permisos de tu cuenta e intenta de nuevo.',
+    } catch (error) {
+      throw AppException(
+        userMessage(
+          error,
+          fallback: 'No pudimos eliminar la sesión. Inténtalo de nuevo.',
+        ),
       );
     }
   }
@@ -240,20 +280,36 @@ class SupabaseRemoteService {
   Future<void> insertPlataforma(JsonMap data) async {
     try {
       await _client.from('plataformas').insert(data);
-    } on SocketException {
-      throw Exception('Sin conexión para crear la plataforma.');
-    } catch (e) {
-      throw Exception('Error al crear plataforma: $e');
+    } catch (error) {
+      throw AppException(
+        userMessage(
+          error,
+          fallback: 'No pudimos crear la plataforma. Inténtalo de nuevo.',
+        ),
+      );
     }
   }
 
   Future<void> deletePlataforma(int id) async {
     try {
-      await _client.from('plataformas').delete().eq('id', id);
-    } on SocketException {
-      throw Exception('Sin conexión para eliminar la plataforma.');
-    } catch (e) {
-      throw Exception('Error al eliminar plataforma: $e');
+      final deleted = await _client
+          .from('plataformas')
+          .delete()
+          .eq('id', id)
+          .select('id');
+      if (deleted.isEmpty) {
+        throw const AppException(
+          'La plataforma ya no existe o no tienes permiso para eliminarla.',
+        );
+      }
+    } catch (error) {
+      throw AppException(
+        userMessage(
+          error,
+          fallback: 'No pudimos eliminar la plataforma. Inténtalo de nuevo.',
+          operation: ErrorOperation.deletePlatform,
+        ),
+      );
     }
   }
 
@@ -264,12 +320,12 @@ class SupabaseRemoteService {
     try {
       final userId = currentUser?.id;
       if (userId == null) {
-        throw Exception('Usuario no autenticado');
+        throw const AppException('Vuelve a iniciar sesión para continuar.');
       }
 
       final file = File(localPath);
       if (!await file.exists()) {
-        throw Exception('No se encontró la imagen seleccionada.');
+        throw const AppException('No se encontró la imagen seleccionada.');
       }
 
       final extension = localPath.contains('.')
@@ -287,10 +343,13 @@ class SupabaseRemoteService {
             fileOptions: const FileOptions(upsert: true),
           );
       return _client.storage.from('avatars').getPublicUrl(storagePath);
-    } on SocketException {
-      throw Exception('Sin conexión. No se pudo subir la imagen.');
-    } catch (e) {
-      throw Exception('Error al subir la imagen: $e');
+    } catch (error) {
+      throw AppException(
+        userMessage(
+          error,
+          fallback: 'No pudimos subir la imagen. Inténtalo de nuevo.',
+        ),
+      );
     }
   }
 
@@ -299,10 +358,14 @@ class SupabaseRemoteService {
       await _client.auth.updateUser(
         UserAttributes(data: {'avatar_url': avatarUrl}),
       );
-    } on AuthException catch (e) {
-      throw Exception('Error al actualizar el perfil: ${e.message}');
-    } catch (e) {
-      throw Exception('No se pudo actualizar la foto de perfil.');
+    } catch (error) {
+      throw AppException(
+        userMessage(
+          error,
+          fallback:
+              'No pudimos actualizar la foto de perfil. Inténtalo de nuevo.',
+        ),
+      );
     }
   }
 
@@ -310,10 +373,13 @@ class SupabaseRemoteService {
   Future<void> updatePassword(String newPassword) async {
     try {
       await _client.auth.updateUser(UserAttributes(password: newPassword));
-    } on AuthException catch (e) {
-      throw Exception('Error al actualizar contraseña: ${e.message}');
-    } catch (e) {
-      throw Exception('Fallo de red al cambiar contraseña.');
+    } catch (error) {
+      throw AppException(
+        userMessage(
+          error,
+          fallback: 'No pudimos cambiar la contraseña. Inténtalo de nuevo.',
+        ),
+      );
     }
   }
 
@@ -321,8 +387,13 @@ class SupabaseRemoteService {
     try {
       await _client.rpc('delete_user');
       await _client.auth.signOut();
-    } catch (e) {
-      throw Exception('Error al eliminar la cuenta.');
+    } catch (error) {
+      throw AppException(
+        userMessage(
+          error,
+          fallback: 'No pudimos eliminar la cuenta. Inténtalo de nuevo.',
+        ),
+      );
     }
   }
 }

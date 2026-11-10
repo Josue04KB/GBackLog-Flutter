@@ -1,3 +1,4 @@
+import '../../core/errors/app_exception.dart';
 import '../../domain/models/game_models.dart';
 import '../../domain/repositories/game_repository.dart';
 import '../../domain/use_cases/validar_usuario.dart';
@@ -32,7 +33,7 @@ class GameRepositoryImpl implements GameRepository {
     required String username,
   }) async {
     final error = validarUsuario(username);
-    if (error != null) throw Exception(error);
+    if (error != null) throw AppException(error);
     await _remoteService.signUp(email.trim(), password, username.trim());
   }
 
@@ -55,7 +56,7 @@ class GameRepositoryImpl implements GameRepository {
   }) async {
     final userId = _remoteService.currentUser?.id;
     if (userId == null) {
-      throw Exception('Usuario no autenticado');
+      throw AppException('Vuelve a iniciar sesión para continuar.');
     }
     await _remoteService.insertPlataforma({
       'nombre': nombre.trim(),
@@ -92,7 +93,7 @@ class GameRepositoryImpl implements GameRepository {
   }) async {
     final userId = _remoteService.currentUser?.id;
     if (userId == null) {
-      throw Exception('Usuario no autenticado');
+      throw AppException('Vuelve a iniciar sesión para continuar.');
     }
 
     await _remoteService.insertVideojuego({

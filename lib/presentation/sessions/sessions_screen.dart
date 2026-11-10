@@ -1,5 +1,7 @@
 import 'dart:io';
 
+import '../../core/errors/error_messages.dart';
+
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
@@ -168,14 +170,17 @@ class _SessionsScreenState extends State<SessionsScreen> {
               onPressed: () async {
                 Navigator.of(dialogCtx).pop();
                 final catalogVm = context.read<CatalogViewModel>();
-                await catalogVm.borrarVideojuego(juegoId);
+                final deleted = await catalogVm.borrarVideojuego(juegoId);
 
                 if (!context.mounted) return;
-                context.pop();
-                ScaffoldMessenger.of(context).showSnackBar(
+                final messenger = ScaffoldMessenger.of(context);
+                if (deleted) context.pop();
+                messenger.showSnackBar(
                   SnackBar(
                     content: Text(
-                      '"$tituloJuego" fue eliminado de tu biblioteca',
+                      deleted
+                          ? '"$tituloJuego" fue eliminado de tu biblioteca'
+                          : catalogVm.errorMessage ?? 'No pudimos eliminar el juego. Inténtalo de nuevo.',
                     ),
                   ),
                 );
@@ -1062,17 +1067,31 @@ class _EditGameScreenState extends State<EditGameScreen> {
   }
 
   Future<void> _seleccionarDesdeGaleria() async {
-    final picker = ImagePicker();
-    final picked = await picker.pickImage(
-      source: ImageSource.gallery,
-      imageQuality: 75,
-    );
-    if (picked == null) return;
+    try {
+      final picker = ImagePicker();
+      final picked = await picker.pickImage(
+        source: ImageSource.gallery,
+        imageQuality: 75,
+      );
+      if (picked == null || !mounted) return;
 
-    setState(() {
-      _archivoGaleria = File(picked.path);
-      _imagenActual = picked.path;
-    });
+      setState(() {
+        _archivoGaleria = File(picked.path);
+        _imagenActual = picked.path;
+      });
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            userMessage(
+              error,
+              fallback: 'No pudimos seleccionar la imagen. Inténtalo de nuevo.',
+            ),
+          ),
+        ),
+      );
+    }
   }
 
   Future<void> _mostrarDialogoIntroducirUrl(bool isDark) async {
@@ -1218,9 +1237,16 @@ class _EditGameScreenState extends State<EditGameScreen> {
     } catch (e) {
       if (!mounted) return;
       setState(() => _guardando = false);
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Error al guardar cambios: $e')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            userMessage(
+              e,
+              fallback: 'No pudimos guardar los cambios. Inténtalo de nuevo.',
+            ),
+          ),
+        ),
+      );
     }
   }
 

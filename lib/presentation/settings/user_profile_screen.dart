@@ -3,6 +3,8 @@ import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 
+import '../../core/errors/error_messages.dart';
+
 import '../auth/auth_view_model.dart';
 import 'settings_view_model.dart';
 
@@ -15,28 +17,42 @@ class UserProfileScreen extends StatefulWidget {
 
 class _UserProfileScreenState extends State<UserProfileScreen> {
   Future<void> _cambiarFotoPerfil() async {
-    final picker = ImagePicker();
-    final pickedFile = await picker.pickImage(
-      source: ImageSource.gallery,
-      imageQuality: 70,
-    );
+    try {
+      final picker = ImagePicker();
+      final pickedFile = await picker.pickImage(
+        source: ImageSource.gallery,
+        imageQuality: 70,
+      );
 
-    if (pickedFile == null) return;
-    if (!mounted) return;
+      if (pickedFile == null) return;
+      if (!mounted) return;
 
-    final settingsVm = context.read<SettingsViewModel>();
-    final updated = await settingsVm.actualizarAvatar(pickedFile.path);
+      final settingsVm = context.read<SettingsViewModel>();
+      final updated = await settingsVm.actualizarAvatar(pickedFile.path);
 
-    if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          updated
-              ? 'Foto de perfil actualizada con éxito'
-              : settingsVm.errorMessage ?? 'No se pudo actualizar la foto',
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            updated
+                ? 'Foto de perfil actualizada con éxito'
+                : settingsVm.errorMessage ?? 'No se pudo actualizar la foto',
+          ),
         ),
-      ),
-    );
+      );
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            userMessage(
+              error,
+              fallback: 'No pudimos seleccionar la foto. Inténtalo de nuevo.',
+            ),
+          ),
+        ),
+      );
+    }
   }
 
   Future<void> _eliminarCuenta(BuildContext context) async {
@@ -310,7 +326,7 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
                   content: Text(
                     ok
                         ? 'Contraseña actualizada con éxito'
-                        : 'Error al actualizar',
+                        : settingsVm.errorMessage ?? 'No pudimos cambiar la contraseña. Inténtalo de nuevo.',
                   ),
                 ),
               );
@@ -364,9 +380,20 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
             ),
             onPressed: () async {
               Navigator.pop(ctx);
-              await authVm.signOut();
+              final signedOut = await authVm.signOut();
               if (!context.mounted) return;
-              context.go('/login');
+              if (signedOut) {
+                context.go('/login');
+              } else {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text(
+                      authVm.errorMessage ??
+                          'No pudimos cerrar sesión. Inténtalo de nuevo.',
+                    ),
+                  ),
+                );
+              }
             },
             child: const Text('Sí, salir'),
           ),

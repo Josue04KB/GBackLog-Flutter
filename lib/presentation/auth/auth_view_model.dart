@@ -1,3 +1,5 @@
+import '../../core/errors/error_messages.dart';
+
 import 'package:flutter/foundation.dart';
 
 import '../../domain/repositories/game_repository.dart';
@@ -40,7 +42,10 @@ class AuthViewModel extends ChangeNotifier {
       return true;
     } catch (e) {
       _isLoading = false;
-      _errorMessage = e.toString().replaceFirst('Exception: ', '');
+      _errorMessage = userMessage(
+        e,
+        fallback: 'No pudimos iniciar sesión. Inténtalo de nuevo.',
+      );
       notifyListeners();
       return false;
     }
@@ -73,17 +78,30 @@ class AuthViewModel extends ChangeNotifier {
       return true;
     } catch (e) {
       _isLoading = false;
-      _errorMessage = e.toString().replaceFirst('Exception: ', '');
+      _errorMessage = userMessage(
+        e,
+        fallback: 'No pudimos crear la cuenta. Inténtalo de nuevo.',
+        operation: ErrorOperation.signUp,
+      );
       notifyListeners();
       return false;
     }
   }
 
-  Future<void> signOut() async {
+  Future<bool> signOut() async {
+    if (_isLoading) return false;
     _isLoading = true;
+    _errorMessage = null;
     notifyListeners();
     try {
       await _repository.signOut();
+      return true;
+    } catch (error) {
+      _errorMessage = userMessage(
+        error,
+        fallback: 'No pudimos cerrar sesión. Inténtalo de nuevo.',
+      );
+      return false;
     } finally {
       _isLoading = false;
       notifyListeners();

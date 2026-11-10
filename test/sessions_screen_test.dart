@@ -1,3 +1,5 @@
+import 'package:gamebacklog_cloud/core/errors/app_exception.dart';
+
 import 'dart:async';
 import 'dart:io';
 import 'dart:ui' as ui;
@@ -58,7 +60,7 @@ class _SessionRepository implements GameRepository {
     required String imagenUrl,
   }) async {
     gameUpdateCalls++;
-    if (failGameUpdate) throw Exception('No se pudo actualizar el juego.');
+    if (failGameUpdate) throw AppException('No se pudo actualizar el juego.');
     gamePlatform = plataforma;
   }
 
@@ -72,7 +74,7 @@ class _SessionRepository implements GameRepository {
     updateCalls++;
     if (pendingUpdate != null) await pendingUpdate!.future;
     if (failUpdate) {
-      throw Exception('No tienes permiso para editar esta sesión.');
+      throw AppException('No tienes permiso para editar esta sesión.');
     }
     final index = sesiones.indexWhere((s) => s.id == id);
     final original = sesiones[index];
@@ -90,7 +92,7 @@ class _SessionRepository implements GameRepository {
   Future<void> eliminarSesion(int id) async {
     deleteCalls++;
     if (pendingDelete != null) await pendingDelete!.future;
-    if (failDelete) throw Exception('Sin conexión. No se pudo eliminar.');
+    if (failDelete) throw AppException('Sin conexión. No se pudo eliminar.');
     sesiones.removeWhere((s) => s.id == id);
   }
 
@@ -137,7 +139,7 @@ class _SessionRepository implements GameRepository {
   }) async {
     insertCalls++;
     if (pendingInsert != null) await pendingInsert!.future;
-    if (failInsert) throw Exception('Sin conexión. Inténtalo de nuevo.');
+    if (failInsert) throw AppException('Sin conexión. Inténtalo de nuevo.');
     sesiones.add(
       SesionJuego(
         id: insertCalls,

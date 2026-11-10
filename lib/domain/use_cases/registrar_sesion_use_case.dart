@@ -1,3 +1,4 @@
+import '../../core/errors/app_exception.dart';
 import '../repositories/game_repository.dart';
 import 'validar_sesion.dart';
 
@@ -14,7 +15,7 @@ class RegistrarSesionUseCase {
   }) async {
     // Regla 1: Obligatoriedad de relación con ambas entidades maestras
     if (videojuegoId == null || plataformaId == null) {
-      throw Exception('Debes seleccionar un videojuego y una plataforma.');
+      throw AppException('Debes seleccionar un videojuego y una plataforma.');
     }
 
     validarSesion(

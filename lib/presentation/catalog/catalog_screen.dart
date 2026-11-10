@@ -302,7 +302,7 @@ class _CatalogScreenState extends State<CatalogScreen> {
                 const Icon(Icons.wifi_off, size: 64, color: Colors.redAccent),
                 const SizedBox(height: 16),
                 Text(
-                  'Sin conexión con Supabase',
+                  'No pudimos cargar tu colección',
                   style: TextStyle(
                     color: textColor,
                     fontSize: 18,
