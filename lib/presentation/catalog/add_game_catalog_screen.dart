@@ -36,6 +36,7 @@ class _AddGameCatalogScreenState extends State<AddGameCatalogScreen> {
     return Scaffold(
       backgroundColor: bgColor,
       appBar: AppBar(
+        automaticallyImplyLeading: false,
         backgroundColor: isDark ? const Color(0xFF171622) : Colors.white,
         title: Text('Explorar Catálogo', style: TextStyle(color: textColor)),
         iconTheme: IconThemeData(color: textColor),
@@ -206,6 +207,7 @@ class _AddGameCatalogScreenState extends State<AddGameCatalogScreen> {
 
     showModalBottomSheet(
       context: parentContext,
+      useRootNavigator: true,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (sheetCtx) {
@@ -368,7 +370,7 @@ class _AddGameCatalogScreenState extends State<AddGameCatalogScreen> {
                                   if (!parentContext.mounted) return;
 
                                   if (ok) {
-                                    parentContext.pop();
+                                    parentContext.go('/catalogo');
                                     ScaffoldMessenger.of(
                                       parentContext,
                                     ).showSnackBar(

@@ -1,4 +1,5 @@
 import 'package:go_router/go_router.dart';
+
 import '../../presentation/auth/auth_screen.dart';
 import '../../presentation/auth/auth_view_model.dart';
 import '../../presentation/catalog/add_game_catalog_screen.dart';
@@ -6,6 +7,7 @@ import '../../presentation/catalog/catalog_screen.dart';
 import '../../presentation/sessions/sessions_screen.dart';
 import '../../presentation/settings/settings_screen.dart';
 import '../../presentation/settings/user_profile_screen.dart';
+import '../../presentation/navigation/main_navigation_shell.dart';
 
 class AppRouter {
   static GoRouter createRouter(AuthViewModel authViewModel) {
@@ -37,17 +39,35 @@ class AppRouter {
           path: '/registro',
           builder: (context, state) => const AuthScreen(isRegister: true),
         ),
-        GoRoute(
-          path: '/catalogo',
-          builder: (context, state) => const CatalogScreen(),
-        ),
-        GoRoute(
-          path: '/agregar_catalogo',
-          builder: (context, state) => const AddGameCatalogScreen(),
-        ),
-        GoRoute(
-          path: '/config',
-          builder: (context, state) => const SettingsScreen(),
+        StatefulShellRoute.indexedStack(
+          builder: (context, state, navigationShell) =>
+              MainNavigationShell(navigationShell: navigationShell),
+          branches: [
+            StatefulShellBranch(
+              routes: [
+                GoRoute(
+                  path: '/catalogo',
+                  builder: (context, state) => const CatalogScreen(),
+                ),
+              ],
+            ),
+            StatefulShellBranch(
+              routes: [
+                GoRoute(
+                  path: '/agregar_catalogo',
+                  builder: (context, state) => const AddGameCatalogScreen(),
+                ),
+              ],
+            ),
+            StatefulShellBranch(
+              routes: [
+                GoRoute(
+                  path: '/config',
+                  builder: (context, state) => const SettingsScreen(),
+                ),
+              ],
+            ),
+          ],
         ),
         GoRoute(
           path: '/perfil',
@@ -58,7 +78,9 @@ class AppRouter {
           builder: (context, state) {
             final juegoIdStr = state.uri.queryParameters['juegoId'];
             final titulo = state.uri.queryParameters['titulo'];
-            final juegoId = juegoIdStr != null ? int.tryParse(juegoIdStr) : null;
+            final juegoId = juegoIdStr != null
+                ? int.tryParse(juegoIdStr)
+                : null;
 
             return SessionsScreen(
               filtroVideojuegoId: juegoId,

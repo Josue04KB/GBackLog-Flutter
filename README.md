@@ -18,6 +18,11 @@ catálogo personal, agregar un videojuego y registrar una sesión de juego.
 - Registro y consulta de sesiones de juego; pulsación prolongada para editar o eliminar.
 - Perfil de usuario, cambio de contraseña y cierre de sesión.
 
+La barra inferior conecta **Backlog** (biblioteca personal), **Explorar**
+(catálogo para agregar juegos) y **Configuración**. La lupa de Mi Colección
+busca por nombre entre los juegos de la biblioteca y se combina con el filtro
+de estado. La búsqueda y los filtros se conservan al cambiar de pestaña.
+
 ## Modelo de datos
 
 La aplicación usa dos entidades maestras y una entidad transaccional:

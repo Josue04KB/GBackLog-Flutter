@@ -15,6 +15,41 @@ class CatalogScreen extends StatefulWidget {
 }
 
 class _CatalogScreenState extends State<CatalogScreen> {
+  final _searchController = TextEditingController();
+  bool _searchOpen = false;
+
+  String _normalize(String value) {
+    var normalized = value.trim().toLowerCase();
+    const accents = {
+      'á': 'a',
+      'é': 'e',
+      'í': 'i',
+      'ó': 'o',
+      'ú': 'u',
+      'ü': 'u',
+    };
+    for (final entry in accents.entries) {
+      normalized = normalized.replaceAll(entry.key, entry.value);
+    }
+    return normalized;
+  }
+
+  void _toggleSearch() {
+    setState(() {
+      _searchOpen = !_searchOpen;
+      if (!_searchOpen) {
+        _searchController.clear();
+        FocusScope.of(context).unfocus();
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
   static const List<String> _filtros = [
     'Todos',
     'En progreso',
@@ -26,6 +61,7 @@ class _CatalogScreenState extends State<CatalogScreen> {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
       context.read<CatalogViewModel>().cargarMaestros();
     });
   }
@@ -78,7 +114,7 @@ class _CatalogScreenState extends State<CatalogScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // --- Encabezado: Avatar + Mi Colección + Configuración ---
+            // --- Encabezado: Avatar + Mi Colección + búsqueda ---
             Padding(
               padding: const EdgeInsets.fromLTRB(20, 16, 12, 4),
               child: Row(
@@ -116,12 +152,15 @@ class _CatalogScreenState extends State<CatalogScreen> {
                     ),
                   ),
                   IconButton(
-                    tooltip: 'Configuración',
-                    icon: Icon(Icons.settings, color: textColor, size: 26),
-                    onPressed: () async {
-                      await context.push('/config');
-                      if (context.mounted) authVm.notifyProfileChanged();
-                    },
+                    tooltip: _searchOpen
+                        ? 'Cerrar búsqueda'
+                        : 'Buscar en mi colección',
+                    icon: Icon(
+                      _searchOpen ? Icons.close_rounded : Icons.search_rounded,
+                      color: textColor,
+                      size: 26,
+                    ),
+                    onPressed: _toggleSearch,
                   ),
                 ],
               ),
@@ -136,6 +175,54 @@ class _CatalogScreenState extends State<CatalogScreen> {
               ),
             ),
             const SizedBox(height: 16),
+
+            if (_searchOpen)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 0, 20, 16),
+                child: TextField(
+                  key: const ValueKey('collection-search'),
+                  controller: _searchController,
+                  autofocus: true,
+                  onChanged: (_) => setState(() {}),
+                  textInputAction: TextInputAction.search,
+                  onSubmitted: (_) => FocusScope.of(context).unfocus(),
+                  style: TextStyle(color: textColor),
+                  decoration: InputDecoration(
+                    hintText: 'Buscar en mi colección',
+                    prefixIcon: const Icon(
+                      Icons.search_rounded,
+                      color: Color(0xFF9B83FF),
+                    ),
+                    suffixIcon: _searchController.text.isEmpty
+                        ? null
+                        : IconButton(
+                            tooltip: 'Limpiar búsqueda',
+                            icon: const Icon(Icons.clear_rounded),
+                            onPressed: () => setState(_searchController.clear),
+                          ),
+                    filled: true,
+                    fillColor: isDark ? const Color(0xFF1A1826) : Colors.white,
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(16),
+                      borderSide: BorderSide(
+                        color: isDark
+                            ? const Color(0xFF343246)
+                            : const Color(0xFFE0DAEF),
+                      ),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(16),
+                      borderSide: const BorderSide(
+                        color: Color(0xFF7C5CFF),
+                        width: 2,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
 
             // --- Filtros horizontales ---
             SizedBox(
@@ -193,19 +280,6 @@ class _CatalogScreenState extends State<CatalogScreen> {
             // --- Grid de juegos ---
             Expanded(child: _buildBody(catalogVm, isDark, textColor)),
           ],
-        ),
-      ),
-      floatingActionButton: SizedBox(
-        width: 58,
-        height: 58,
-        child: FloatingActionButton(
-          tooltip: 'Agregar videojuego',
-          backgroundColor: const Color(0xFF7C5CFF),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(18),
-          ),
-          onPressed: () => context.push('/agregar_catalogo'),
-          child: const Icon(Icons.add, color: Colors.white, size: 30),
         ),
       ),
     );
@@ -270,11 +344,17 @@ class _CatalogScreenState extends State<CatalogScreen> {
         );
 
       case ViewState.success:
-        final lista = vm.videojuegosFiltrados;
+        final query = _normalize(_searchController.text);
+        final lista = vm.videojuegosFiltrados
+            .where((juego) => _normalize(juego.titulo).contains(query))
+            .toList();
         if (lista.isEmpty) {
           return Center(
             child: Text(
-              'No hay juegos en este estado.',
+              query.isEmpty
+                  ? 'No hay juegos en este estado.'
+                  : 'No hay juegos que coincidan con tu búsqueda y filtro.',
+              textAlign: TextAlign.center,
               style: TextStyle(
                 color: isDark ? Colors.white54 : Colors.black54,
                 fontSize: 15,
@@ -287,7 +367,7 @@ class _CatalogScreenState extends State<CatalogScreen> {
           builder: (context, constraints) {
             final crossAxisCount = constraints.maxWidth > 700 ? 4 : 2;
             return GridView.builder(
-              padding: const EdgeInsets.fromLTRB(16, 4, 16, 90),
+              padding: const EdgeInsets.fromLTRB(16, 4, 16, 20),
               gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
                 crossAxisCount: crossAxisCount,
                 crossAxisSpacing: 14,

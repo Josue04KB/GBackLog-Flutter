@@ -49,6 +49,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       child: Scaffold(
         backgroundColor: bgColor,
         appBar: AppBar(
+          automaticallyImplyLeading: false,
           backgroundColor: appBarBg,
           title: Text('Configuración', style: TextStyle(color: textColor)),
           iconTheme: IconThemeData(color: textColor),
