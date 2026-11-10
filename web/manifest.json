@@ -1,11 +1,11 @@
 {
-    "name": "gamebacklog_cloud",
-    "short_name": "gamebacklog_cloud",
+    "name": "GameBacklog",
+    "short_name": "GameBacklog",
     "start_url": ".",
     "display": "standalone",
-    "background_color": "#0175C2",
-    "theme_color": "#0175C2",
-    "description": "A new Flutter project.",
+    "background_color": "#0D0C14",
+    "theme_color": "#6949DB",
+    "description": "Tu biblioteca de videojuegos y sesiones de juego.",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
     "icons": [

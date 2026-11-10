@@ -3,9 +3,14 @@ import '../models/game_models.dart';
 abstract class GameRepository {
   bool get hasValidSession;
   String? get currentUserEmail;
+  String? get currentUsername;
   String? get currentUserAvatarUrl;
   Future<void> signIn({required String email, required String password});
-  Future<void> signUp({required String email, required String password});
+  Future<void> signUp({
+    required String email,
+    required String password,
+    required String username,
+  });
   Future<void> signOut();
 
   Future<List<Plataforma>> getPlataformas();

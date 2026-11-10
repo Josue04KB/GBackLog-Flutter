@@ -3,7 +3,6 @@ import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:gamebacklog_cloud/core/router/app_router.dart';
 import 'package:gamebacklog_cloud/domain/models/game_models.dart';
@@ -15,6 +14,8 @@ import 'package:gamebacklog_cloud/presentation/sessions/session_view_model.dart'
 import 'package:gamebacklog_cloud/presentation/settings/settings_view_model.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
+
+import 'support/test_fonts.dart';
 
 class _Repository implements GameRepository {
   bool loggedIn = true;
@@ -51,6 +52,8 @@ class _Repository implements GameRepository {
   bool get hasValidSession => loggedIn;
   @override
   String? get currentUserEmail => 'jugador@example.com';
+  @override
+  String? get currentUsername => 'jugador';
   @override
   String? get currentUserAvatarUrl => null;
   @override
@@ -178,22 +181,7 @@ Finder _tab(int index) => find.byKey(ValueKey('nav-$index'));
 Finder get _search => find.byKey(const ValueKey('collection-search'));
 
 void main() {
-  setUpAll(() async {
-    final fonts = Platform.environment['SESSION_PREVIEW_FONT_DIR'];
-    if (fonts == null) return;
-    await (FontLoader('Roboto')..addFont(
-          File('$fonts/roboto-regular.ttf')
-              .readAsBytes()
-              .then(ByteData.sublistView),
-        ))
-        .load();
-    await (FontLoader('MaterialIcons')..addFont(
-          File('$fonts/materialicons-regular.otf')
-              .readAsBytes()
-              .then(ByteData.sublistView),
-        ))
-        .load();
-  });
+  setUpAll(loadTestFonts);
 
   testWidgets(
     'busca por nombre sin distinguir mayúsculas ni acentos y combina el filtro',

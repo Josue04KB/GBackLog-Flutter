@@ -1,5 +1,6 @@
 import '../../domain/models/game_models.dart';
 import '../../domain/repositories/game_repository.dart';
+import '../../domain/use_cases/validar_usuario.dart';
 import '../services/supabase_remote_service.dart';
 
 class GameRepositoryImpl implements GameRepository {
@@ -14,6 +15,9 @@ class GameRepositoryImpl implements GameRepository {
   String? get currentUserEmail => _remoteService.currentUser?.email;
 
   @override
+  String? get currentUsername => _remoteService.currentUsername;
+
+  @override
   String? get currentUserAvatarUrl => _remoteService.currentUserAvatarUrl;
 
   @override
@@ -22,8 +26,14 @@ class GameRepositoryImpl implements GameRepository {
   }
 
   @override
-  Future<void> signUp({required String email, required String password}) async {
-    await _remoteService.signUp(email.trim(), password);
+  Future<void> signUp({
+    required String email,
+    required String password,
+    required String username,
+  }) async {
+    final error = validarUsuario(username);
+    if (error != null) throw Exception(error);
+    await _remoteService.signUp(email.trim(), password, username.trim());
   }
 
   @override

@@ -110,7 +110,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            'Usuario Activo',
+                            settingsVm.username ?? 'Usuario Activo',
                             style: TextStyle(color: subtextColor, fontSize: 13),
                           ),
                           const SizedBox(height: 4),

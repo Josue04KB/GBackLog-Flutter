@@ -22,6 +22,8 @@ class _SettingsRepository implements GameRepository {
 
   @override
   String? get currentUserEmail => 'jugador@example.com';
+  @override
+  String? get currentUsername => 'jugador';
 
   @override
   Future<List<Videojuego>> getVideojuegos() async => [];

@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
 import 'auth_view_model.dart';
+import '../../domain/use_cases/validar_usuario.dart';
 
 class AuthScreen extends StatefulWidget {
   final bool isRegister;
@@ -15,11 +16,13 @@ class AuthScreen extends StatefulWidget {
 
 class _AuthScreenState extends State<AuthScreen> {
   final _formKey = GlobalKey<FormState>();
+  final _usernameController = TextEditingController();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
 
   @override
   void dispose() {
+    _usernameController.dispose();
     _emailController.dispose();
     _passwordController.dispose();
     super.dispose();
@@ -106,9 +109,62 @@ class _AuthScreenState extends State<AuthScreen> {
                     key: _formKey,
                     child: Column(
                       children: [
-                        // --- Campo Usuario o Correo con Label Flotante ---
+                        if (widget.isRegister) ...[
+                          TextFormField(
+                            key: const ValueKey('register-username'),
+                            controller: _usernameController,
+                            enabled: !authViewModel.isLoading,
+                            textInputAction: TextInputAction.next,
+                            autofillHints: const [AutofillHints.newUsername],
+                            autocorrect: false,
+                            enableSuggestions: false,
+                            autovalidateMode:
+                                AutovalidateMode.onUserInteraction,
+                            style: TextStyle(color: textColor),
+                            decoration: InputDecoration(
+                              labelText: 'Usuario',
+                              hintText: 'Ej. Usuario123',
+                              helperText:
+                                  '3–30 caracteres: letras, números, . o _',
+                              helperMaxLines: 2,
+                              errorMaxLines: 3,
+                              labelStyle: TextStyle(color: hintColor),
+                              floatingLabelStyle: const TextStyle(
+                                color: Color(0xFF7C5CFF),
+                                fontWeight: FontWeight.bold,
+                              ),
+                              prefixIcon: const Icon(
+                                Icons.person_outline,
+                                color: Color(0xFF9B83FF),
+                              ),
+                              filled: true,
+                              fillColor: isDark
+                                  ? const Color(0xFF1E1B2E)
+                                  : Colors.grey.shade100,
+                              enabledBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12),
+                                borderSide: BorderSide(
+                                  color: isDark
+                                      ? const Color(0xFF343246)
+                                      : Colors.grey.shade300,
+                                ),
+                              ),
+                              focusedBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12),
+                                borderSide: const BorderSide(
+                                  color: Color(0xFF7C5CFF),
+                                  width: 2,
+                                ),
+                              ),
+                            ),
+                            validator: validarUsuario,
+                          ),
+                          const SizedBox(height: 20),
+                        ],
+                        // --- Correo electrónico ---
                         TextFormField(
                           controller: _emailController,
+                          enabled: !authViewModel.isLoading,
                           keyboardType: TextInputType.emailAddress,
                           textInputAction: TextInputAction.next,
                           autofillHints: const [AutofillHints.email],
@@ -158,6 +214,7 @@ class _AuthScreenState extends State<AuthScreen> {
                         // --- Campo Contraseña con Label Flotante ---
                         TextFormField(
                           controller: _passwordController,
+                          enabled: !authViewModel.isLoading,
                           obscureText: true,
                           textInputAction: TextInputAction.done,
                           autofillHints: widget.isRegister
@@ -253,8 +310,9 @@ class _AuthScreenState extends State<AuthScreen> {
                 const SizedBox(height: 24),
 
                 // --- Enlace inferior para alternar ---
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
+                Wrap(
+                  alignment: WrapAlignment.center,
+                  crossAxisAlignment: WrapCrossAlignment.center,
                   children: [
                     Text(
                       widget.isRegister
@@ -263,13 +321,15 @@ class _AuthScreenState extends State<AuthScreen> {
                       style: TextStyle(color: hintColor),
                     ),
                     TextButton(
-                      onPressed: () {
-                        if (widget.isRegister) {
-                          context.go('/login');
-                        } else {
-                          context.go('/registro');
-                        }
-                      },
+                      onPressed: authViewModel.isLoading
+                          ? null
+                          : () {
+                              if (widget.isRegister) {
+                                context.go('/login');
+                              } else {
+                                context.go('/registro');
+                              }
+                            },
                       child: Text(
                         widget.isRegister
                             ? 'Inicia sesión aquí'
@@ -291,18 +351,37 @@ class _AuthScreenState extends State<AuthScreen> {
   }
 
   Future<void> _submit(AuthViewModel authViewModel) async {
+    if (authViewModel.isLoading) return;
     if (!(_formKey.currentState?.validate() ?? false)) return;
 
     final email = _emailController.text.trim();
     final password = _passwordController.text;
+    FocusScope.of(context).unfocus();
     final success = widget.isRegister
-        ? await authViewModel.signUp(email, password)
+        ? await authViewModel.signUp(
+            email,
+            password,
+            username: _usernameController.text,
+          )
         : await authViewModel.signIn(email, password);
 
     if (!mounted) return;
 
     if (success) {
-      context.go('/catalogo');
+      if (widget.isRegister && !authViewModel.isAuthenticated) {
+        final messenger = ScaffoldMessenger.of(context);
+        context.go('/login');
+        messenger.showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Revisa tu correo para confirmar tu cuenta. Después podrás iniciar sesión.',
+            ),
+            duration: Duration(seconds: 8),
+          ),
+        );
+      } else {
+        context.go('/catalogo');
+      }
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(

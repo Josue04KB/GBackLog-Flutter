@@ -15,6 +15,7 @@ class SettingsViewModel extends ChangeNotifier {
   bool get isLoading => _isLoading;
   String? get errorMessage => _errorMessage;
   String? get userEmail => _repository.currentUserEmail;
+  String? get username => _repository.currentUsername;
   String? get userAvatarUrl => _repository.currentUserAvatarUrl;
 
   void toggleTheme(bool value) {

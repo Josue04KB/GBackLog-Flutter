@@ -6,18 +6,35 @@ import 'package:gamebacklog_cloud/data/repositories/game_repository_impl.dart';
 import 'package:gamebacklog_cloud/data/services/supabase_remote_service.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+class _MemoryPkceStorage extends GotrueAsyncStorage {
+  final _values = <String, String>{};
+  @override
+  Future<String?> getItem({required String key}) async => _values[key];
+  @override
+  Future<void> setItem({required String key, required String value}) async {
+    _values[key] = value;
+  }
+
+  @override
+  Future<void> removeItem({required String key}) async {
+    _values.remove(key);
+  }
+}
+
 // El transporte usa el SDK real contra un servidor HTTP local de prueba.
 // No inicia sesión ni accede al proyecto Supabase del usuario.
 class _AuthenticatedRemote extends SupabaseRemoteService {
   _AuthenticatedRemote(SupabaseClient client) : super(client: client);
   bool authenticated = true;
+  Map<String, dynamic> metadata = {};
 
   @override
   User? get currentUser => authenticated
-      ? const User(
+      ? User(
           id: 'test-user',
           appMetadata: {},
-          userMetadata: {},
+          userMetadata: metadata,
+          email: 'legacy@example.com',
           aud: 'authenticated',
           createdAt: '2026-11-09T00:00:00Z',
         )
@@ -49,6 +66,7 @@ void main() {
     client = SupabaseClient(
       'http://127.0.0.1:${server.port}',
       'local-test-key',
+      authOptions: AuthClientOptions(pkceAsyncStorage: _MemoryPkceStorage()),
     );
     remote = _AuthenticatedRemote(client);
     repository = GameRepositoryImpl(remote);
@@ -67,6 +85,71 @@ void main() {
       notas: '  Avance editado  ',
     );
   }
+
+  test('nombre de usuario lee metadata y mantiene compatibilidad con cuentas antiguas', () {
+    expect(repository.currentUsername, 'legacy');
+    remote.metadata = {'username': '  Josue_gamer  '};
+    expect(repository.currentUsername, 'Josue_gamer');
+    remote.authenticated = false;
+    expect(repository.currentUsername, isNull);
+  });
+
+  test('registro envía username en metadata para el trigger y no escribe profiles desde el cliente', () async {
+    responseBody = {
+      'id': '11111111-1111-4111-8111-111111111111',
+      'aud': 'authenticated',
+      'email': 'josue@example.com',
+      'app_metadata': {},
+      'user_metadata': {'username': 'Josue_gamer'},
+      'created_at': '2026-11-10T00:00:00Z',
+    };
+    await repository.signUp(
+      email: ' josue@example.com ',
+      password: ' password123 ',
+      username: ' Josue_gamer ',
+    );
+    expect(requests.single.method, 'POST');
+    expect(requests.single.uri.path, '/auth/v1/signup');
+    final body = jsonDecode(requests.single.body) as Map<String, dynamic>;
+    expect(body['email'], 'josue@example.com');
+    expect(body['password'], ' password123 ');
+    expect(body['data'], {'username': 'Josue_gamer'});
+    expect(repository.hasValidSession, isFalse);
+  });
+
+  test('registro inválido no envía solicitudes', () async {
+    await expectLater(
+      repository.signUp(
+        email: 'josue@example.com',
+        password: 'password123',
+        username: ' ',
+      ),
+      throwsA(isA<Exception>()),
+    );
+    expect(requests, isEmpty);
+  });
+
+  test('rechazo del trigger no se presenta como registro exitoso', () async {
+    responseStatus = 500;
+    responseBody = {
+      'code': 'unexpected_failure',
+      'msg': 'Database error saving new user',
+    };
+    await expectLater(
+      repository.signUp(
+        email: 'josue@example.com',
+        password: 'password123',
+        username: 'Josue_gamer',
+      ),
+      throwsA(
+        isA<Exception>().having(
+          (e) => e.toString(),
+          'mensaje',
+          contains('Prueba con otro nombre de usuario'),
+        ),
+      ),
+    );
+  });
 
   test(
     'editar juego persiste la plataforma en videojuegos sin modificar sesiones',

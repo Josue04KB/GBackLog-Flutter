@@ -13,6 +13,16 @@ class SupabaseRemoteService {
 
   Session? get currentSession => _client.auth.currentSession;
   User? get currentUser => _client.auth.currentUser;
+  String? get currentUsername {
+    final username = currentUser?.userMetadata?['username'];
+    if (username is String && username.trim().isNotEmpty) {
+      return username.trim();
+    }
+    // Coincide con el nombre de respaldo usado en el SQL para cuentas antiguas.
+    final email = currentUser?.email;
+    return email != null && email.contains('@') ? email.split('@').first : null;
+  }
+
   String? get currentUserAvatarUrl {
     final avatarUrl = currentUser?.userMetadata?['avatar_url'];
     return avatarUrl is String && avatarUrl.isNotEmpty ? avatarUrl : null;
@@ -32,10 +42,19 @@ class SupabaseRemoteService {
     }
   }
 
-  Future<void> signUp(String email, String password) async {
+  Future<void> signUp(String email, String password, String username) async {
     try {
-      await _client.auth.signUp(email: email, password: password);
+      await _client.auth.signUp(
+        email: email,
+        password: password,
+        data: {'username': username},
+      );
     } on AuthException catch (e) {
+      if (e.message.toLowerCase().contains('database error saving new user')) {
+        throw Exception(
+          'No se pudo crear la cuenta. Prueba con otro nombre de usuario. Si el problema continúa, contacta al administrador.',
+        );
+      }
       throw Exception('No se pudo registrar la cuenta: ${e.message}');
     } on SocketException {
       throw Exception(

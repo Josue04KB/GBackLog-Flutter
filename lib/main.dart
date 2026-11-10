@@ -91,7 +91,7 @@ class _AppRootViewState extends State<_AppRootView> {
     final settingsVm = context.watch<SettingsViewModel>();
 
     return MaterialApp.router(
-      title: 'GameBacklog Cloud',
+      title: 'GameBacklog',
       debugShowCheckedModeBanner: false,
       themeMode: settingsVm.isDarkMode ? ThemeMode.dark : ThemeMode.light,
       theme: ThemeData(

@@ -4,7 +4,6 @@ import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:gamebacklog_cloud/domain/models/game_models.dart';
 import 'package:gamebacklog_cloud/domain/repositories/game_repository.dart';
@@ -14,6 +13,8 @@ import 'package:gamebacklog_cloud/presentation/sessions/session_view_model.dart'
 import 'package:gamebacklog_cloud/presentation/sessions/new_session_sheet.dart';
 import 'package:gamebacklog_cloud/presentation/sessions/sessions_screen.dart';
 import 'package:provider/provider.dart';
+
+import 'support/test_fonts.dart';
 
 final _previewKey = GlobalKey();
 
@@ -256,25 +257,7 @@ Finder get _save => find.ancestor(
 );
 
 void main() {
-  setUpAll(() async {
-    final fonts = Platform.environment['SESSION_PREVIEW_FONT_DIR'];
-    if (fonts != null) {
-      final loader = FontLoader('Roboto')
-        ..addFont(
-          File('$fonts/roboto-regular.ttf')
-              .readAsBytes()
-              .then(ByteData.sublistView),
-        );
-      await loader.load();
-      final icons = FontLoader('MaterialIcons')
-        ..addFont(
-          File('$fonts/materialicons-regular.otf')
-              .readAsBytes()
-              .then(ByteData.sublistView),
-        );
-      await icons.load();
-    }
-  });
+  setUpAll(loadTestFonts);
 
   testWidgets(
     'pulsación prolongada permite editar sin cambiar id, juego ni fecha',

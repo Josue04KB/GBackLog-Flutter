@@ -1,4 +1,4 @@
-# GameBacklog Cloud
+# GameBacklog
 
 Aplicación Android desarrollada con Flutter para que una persona gestione su
 colección de videojuegos y registre sus sesiones de juego desde la nube.
@@ -12,7 +12,7 @@ catálogo personal, agregar un videojuego y registrar una sesión de juego.
 
 ## Pantallas principales
 
-- Registro e inicio de sesión.
+- Registro con usuario, correo y contraseña; inicio de sesión con correo y contraseña.
 - Catálogo personal y exploración del catálogo global.
 - Configuración y consulta de plataformas maestras.
 - Registro y consulta de sesiones de juego; pulsación prolongada para editar o eliminar.
@@ -50,6 +50,9 @@ repositorio.
 
 Para habilitar la edición y eliminación de sesiones, consulta la
 [guía de permisos de Supabase](supabase/README.md) y el SQL incluido allí.
+
+El registro envía el nombre de usuario al trigger de perfiles ya configurado;
+consulta [registro con usuario](supabase/registration.md) para verificarlo.
 
 ## Arquitectura y herramientas
 

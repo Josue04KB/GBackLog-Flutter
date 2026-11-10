@@ -141,7 +141,7 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
             const SizedBox(height: 16),
             Center(
               child: Text(
-                'Usuario Activo',
+                settingsVm.username ?? 'Usuario Activo',
                 style: TextStyle(
                   color: textColor,
                   fontSize: 18,
