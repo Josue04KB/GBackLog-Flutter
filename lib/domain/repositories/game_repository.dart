@@ -23,6 +23,7 @@ abstract class GameRepository {
     required int id,
     required String titulo,
     required String estado,
+    required String plataforma,
     required String imagenUrl,
   });
   Future<void> eliminarVideojuego(int id);
@@ -34,6 +35,13 @@ abstract class GameRepository {
     required int minutosJugados,
     required String notas,
   });
+  Future<SesionJuego> actualizarSesion({
+    required int id,
+    required int plataformaId,
+    required int minutosJugados,
+    required String notas,
+  });
+  Future<void> eliminarSesion(int id);
 
   Future<void> crearPlataforma({
     required String nombre,

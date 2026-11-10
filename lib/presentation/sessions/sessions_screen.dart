@@ -10,6 +10,7 @@ import '../../domain/models/game_models.dart';
 import '../catalog/catalog_view_model.dart';
 import '../widgets/ui_state.dart';
 import 'new_session_sheet.dart';
+import 'delete_session_dialog.dart';
 import 'session_view_model.dart';
 
 class SessionsScreen extends StatefulWidget {
@@ -30,6 +31,8 @@ class _SessionsScreenState extends State<SessionsScreen> {
   String? _tituloLocal;
   String? _estadoLocal;
   String? _imagenLocal;
+  String? _plataformaLocal;
+  bool _sessionActionsOpen = false;
 
   @override
   void initState() {
@@ -98,6 +101,7 @@ class _SessionsScreenState extends State<SessionsScreen> {
           juegoId: juegoId,
           tituloInicial: tituloActual,
           estadoInicial: estadoActual,
+          plataformaInicial: juegoActual?.plataforma ?? _plataformaLocal ?? '',
           imagenInicial: imagenActual,
         ),
       ),
@@ -108,6 +112,7 @@ class _SessionsScreenState extends State<SessionsScreen> {
         _tituloLocal = resultado['titulo']?.toString();
         _estadoLocal = resultado['estado']?.toString();
         _imagenLocal = resultado['imagen_url']?.toString();
+        _plataformaLocal = resultado['plataforma']?.toString();
       });
     }
   }
@@ -183,33 +188,44 @@ class _SessionsScreenState extends State<SessionsScreen> {
     );
   }
 
-  Future<void> _mostrarDialogoNuevaSesion(Videojuego? juegoActual) async {
+  Future<void> _mostrarDialogoNuevaSesion(
+    Videojuego? juegoActual, {
+    SesionJuego? sesion,
+  }) async {
     final sessionVm = context.read<SessionViewModel>();
     final catalogVm = context.read<CatalogViewModel>();
     final juego =
         juegoActual ??
         (catalogVm.videojuegos.isNotEmpty ? catalogVm.videojuegos.first : null);
-    final juegoId = widget.filtroVideojuegoId ?? juego?.id;
-    // La selección conserva una lista estable mientras el formulario está abierto.
-    final plataformas = List<Plataforma>.unmodifiable(catalogVm.plataformas);
-
-    if (juegoId == null || plataformas.isEmpty) {
+    final juegoId =
+        sesion?.videojuegoId ?? widget.filtroVideojuegoId ?? juego?.id;
+    if (juegoId == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text(
-            'Agrega al menos un videojuego y una plataforma antes de registrar una sesión.',
-          ),
+          content: Text('Agrega un videojuego antes de registrar una sesión.'),
         ),
       );
       return;
     }
 
-    final coincidencia = plataformas.where(
-      (p) => p.nombre.toLowerCase() == (juego?.plataforma ?? '').toLowerCase(),
+    final coincidencia = catalogVm.plataformas.where(
+      (p) =>
+          p.nombre.trim().toLowerCase() ==
+          (juego?.plataforma ?? '').trim().toLowerCase(),
     );
-    final plataformaId = coincidencia.isNotEmpty
-        ? coincidencia.first.id
-        : plataformas.first.id;
+    // Las nuevas sesiones heredan la plataforma del juego. Al editar una
+    // sesión se conserva su plataforma histórica, aunque el juego cambie.
+    final plataformaId = sesion?.plataformaId ?? coincidencia.firstOrNull?.id;
+    if (plataformaId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Selecciona una plataforma disponible en Editar juego antes de registrar una sesión.',
+          ),
+        ),
+      );
+      return;
+    }
     final guardada = await showModalBottomSheet<bool>(
       context: context,
       isScrollControlled: true,
@@ -221,17 +237,26 @@ class _SessionsScreenState extends State<SessionsScreen> {
       constraints: const BoxConstraints(maxWidth: 600),
       builder: (_) => NewSessionSheet(
         videojuegoTitulo:
-            juego?.titulo ?? widget.videojuegoTitulo ?? 'Videojuego',
-        plataformas: plataformas,
-        plataformaInicialId: plataformaId,
+            sesion?.videojuegoTitulo ??
+            juego?.titulo ??
+            widget.videojuegoTitulo ??
+            'Videojuego',
+        sesionInicial: sesion,
         onSave: (draft) async {
-          final ok = await sessionVm.registrarNuevaSesion(
-            videojuegoId: juegoId,
-            plataformaId: draft.plataformaId,
-            minutosJugados: draft.minutosJugados,
-            notas: draft.notas,
-            filtroVideojuegoIdActual: widget.filtroVideojuegoId,
-          );
+          final ok = sesion != null
+              ? await sessionVm.editarSesion(
+                  id: sesion.id,
+                  plataformaId: plataformaId,
+                  minutosJugados: draft.minutosJugados,
+                  notas: draft.notas,
+                )
+              : await sessionVm.registrarNuevaSesion(
+                  videojuegoId: juegoId,
+                  plataformaId: plataformaId,
+                  minutosJugados: draft.minutosJugados,
+                  notas: draft.notas,
+                  filtroVideojuegoIdActual: widget.filtroVideojuegoId,
+                );
           return ok
               ? null
               : sessionVm.errorMessage ??
@@ -241,8 +266,103 @@ class _SessionsScreenState extends State<SessionsScreen> {
     );
 
     if (!mounted || guardada != true) return;
-    ScaffoldMessenger.of(context)
-        .showSnackBar(const SnackBar(content: Text('Sesión registrada')));
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          sesion == null ? 'Sesión registrada' : 'Sesión actualizada',
+        ),
+      ),
+    );
+  }
+
+  Future<void> _mostrarAccionesSesion(SesionJuego sesion) async {
+    if (_sessionActionsOpen || context.read<SessionViewModel>().isSubmitting) {
+      return;
+    }
+    _sessionActionsOpen = true;
+    try {
+      final isDark = Theme.of(context).brightness == Brightness.dark;
+      final action = await showModalBottomSheet<String>(
+        context: context,
+        useSafeArea: true,
+        isScrollControlled: true,
+        backgroundColor: isDark ? const Color(0xFF1A1826) : Colors.white,
+        showDragHandle: true,
+        constraints: const BoxConstraints(maxWidth: 600),
+        shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        builder: (sheetContext) => SafeArea(
+          top: false,
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+                  child: Text(
+                    '${sesion.minutosJugados} minutos · ${_formatearFecha(sesion.fecha)}',
+                    style: Theme.of(context).textTheme.titleMedium,
+                  ),
+                ),
+                ListTile(
+                  leading: const Icon(
+                    Icons.edit_outlined,
+                    color: Color(0xFF9B83FF),
+                  ),
+                  title: const Text('Editar'),
+                  subtitle: const Text('Cambiar minutos o notas'),
+                  onTap: () => Navigator.of(sheetContext).pop('editar'),
+                ),
+                ListTile(
+                  leading: const Icon(
+                    Icons.delete_outline_rounded,
+                    color: Colors.redAccent,
+                  ),
+                  title: const Text(
+                    'Eliminar',
+                    style: TextStyle(color: Colors.redAccent),
+                  ),
+                  subtitle: const Text('Quitar esta sesión del historial'),
+                  onTap: () => Navigator.of(sheetContext).pop('eliminar'),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+      if (!mounted) return;
+      if (action == 'editar') {
+        final juegos = context.read<CatalogViewModel>().videojuegos.where(
+          (j) => j.id == sesion.videojuegoId,
+        );
+        await _mostrarDialogoNuevaSesion(juegos.firstOrNull, sesion: sesion);
+      } else if (action == 'eliminar') {
+        final vm = context.read<SessionViewModel>();
+        final deleted = await showDialog<bool>(
+          context: context,
+          barrierDismissible: false,
+          builder: (_) => DeleteSessionDialog(
+            detalle:
+                '${sesion.minutosJugados} minutos jugados\n${_formatearFecha(sesion.fecha)}',
+            onDelete: () async {
+              final ok = await vm.eliminarSesion(sesion.id);
+              return ok
+                  ? null
+                  : vm.errorMessage ??
+                        'No se pudo eliminar la sesión. Reintenta.';
+            },
+          ),
+        );
+        if (!mounted || deleted != true) return;
+        ScaffoldMessenger.of(context)
+            .showSnackBar(const SnackBar(content: Text('Sesión eliminada')));
+      }
+    } finally {
+      _sessionActionsOpen = false;
+    }
   }
 
   Widget _buildPosterImage(String imagePath, bool isDark) {
@@ -307,7 +427,8 @@ class _SessionsScreenState extends State<SessionsScreen> {
         widget.videojuegoTitulo ??
         'Detalles del Juego';
     final estadoMostrar = juegoActual?.estado ?? _estadoLocal ?? 'Pendiente';
-    final plataformaMostrar = juegoActual?.plataforma ?? 'PC';
+    final plataformaMostrar =
+        juegoActual?.plataforma ?? _plataformaLocal ?? 'PC';
 
     final rawImagen = juegoActual?.imagenUrl ?? _imagenLocal;
     final imagenMostrar = (rawImagen != null && rawImagen.isNotEmpty)
@@ -650,12 +771,16 @@ class _SessionsScreenState extends State<SessionsScreen> {
           itemBuilder: (context, index) {
             final sesion = vm.sesiones[index];
             return Card(
+              key: ValueKey('sesion-${sesion.id}'),
               color: cardBg,
               margin: const EdgeInsets.only(bottom: 10),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(14),
               ),
               child: ListTile(
+                onLongPress: vm.isSubmitting
+                    ? null
+                    : () => _mostrarAccionesSesion(sesion),
                 leading: CircleAvatar(
                   backgroundColor: const Color(0xFF7C5CFF)
                       .withValues(alpha: 0.2),
@@ -701,6 +826,7 @@ class EditGameScreen extends StatefulWidget {
   final int juegoId;
   final String tituloInicial;
   final String estadoInicial;
+  final String plataformaInicial;
   final String imagenInicial;
 
   const EditGameScreen({
@@ -708,6 +834,7 @@ class EditGameScreen extends StatefulWidget {
     required this.juegoId,
     required this.tituloInicial,
     required this.estadoInicial,
+    required this.plataformaInicial,
     required this.imagenInicial,
   });
 
@@ -718,6 +845,8 @@ class EditGameScreen extends StatefulWidget {
 class _EditGameScreenState extends State<EditGameScreen> {
   late final TextEditingController _tituloCtrl;
   late String _estadoSeleccionado;
+  late final List<String> _plataformasDisponibles;
+  String? _plataformaSeleccionada;
   late String _imagenActual;
   File? _archivoGaleria;
   bool _guardando = false;
@@ -736,6 +865,20 @@ class _EditGameScreenState extends State<EditGameScreen> {
         ? widget.estadoInicial
         : 'Pendiente';
     _imagenActual = widget.imagenInicial;
+    _plataformasDisponibles = context
+        .read<CatalogViewModel>()
+        .plataformas
+        .map((p) => p.nombre.trim())
+        .where((nombre) => nombre.isNotEmpty)
+        .toSet()
+        .toList();
+    _plataformaSeleccionada = _plataformasDisponibles
+        .where(
+          (nombre) =>
+              nombre.toLowerCase() ==
+              widget.plataformaInicial.trim().toLowerCase(),
+        )
+        .firstOrNull;
   }
 
   @override
@@ -993,6 +1136,7 @@ class _EditGameScreenState extends State<EditGameScreen> {
   }
 
   Future<void> _guardarCambios() async {
+    if (_guardando) return;
     final nuevoTitulo = _tituloCtrl.text.trim();
     if (nuevoTitulo.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -1003,6 +1147,17 @@ class _EditGameScreenState extends State<EditGameScreen> {
       return;
     }
 
+    final plataforma = _plataformaSeleccionada;
+    if (plataforma == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Selecciona una plataforma. Si no hay opciones, agrega una en Configuración.',
+          ),
+        ),
+      );
+      return;
+    }
     setState(() => _guardando = true);
 
     try {
@@ -1035,6 +1190,7 @@ class _EditGameScreenState extends State<EditGameScreen> {
         id: widget.juegoId,
         nuevoTitulo: nuevoTitulo,
         nuevoEstado: _estadoSeleccionado,
+        nuevaPlataforma: plataforma,
         nuevaImagenUrl: urlFinal,
       );
 
@@ -1045,6 +1201,7 @@ class _EditGameScreenState extends State<EditGameScreen> {
         Navigator.of(context).pop(<String, String>{
           'titulo': nuevoTitulo,
           'estado': _estadoSeleccionado,
+          'plataforma': plataforma,
           'imagen_url': urlFinal,
         });
         ScaffoldMessenger.of(context).showSnackBar(
@@ -1242,7 +1399,8 @@ class _EditGameScreenState extends State<EditGameScreen> {
                   dropdownColor: isDark
                       ? const Color(0xFF1E1C2A)
                       : Colors.white,
-                  style: TextStyle(color: textColor, fontSize: 15),
+                  style: Theme.of(context).textTheme.bodyLarge
+                      ?.copyWith(color: textColor, fontSize: 15),
                   decoration: InputDecoration(
                     labelText: 'Estado en tu colección',
                     labelStyle: TextStyle(color: subtextColor),
@@ -1270,11 +1428,64 @@ class _EditGameScreenState extends State<EditGameScreen> {
                         ),
                       )
                       .toList(),
-                  onChanged: (nuevoEstado) {
-                    if (nuevoEstado != null) {
-                      setState(() => _estadoSeleccionado = nuevoEstado);
-                    }
-                  },
+                  onChanged: _guardando
+                      ? null
+                      : (nuevoEstado) {
+                          if (nuevoEstado != null) {
+                            setState(() => _estadoSeleccionado = nuevoEstado);
+                          }
+                        },
+                ),
+                const SizedBox(height: 18),
+                DropdownButtonFormField<String>(
+                  key: const ValueKey('plataforma-juego'),
+                  initialValue: _plataformaSeleccionada,
+                  isExpanded: true,
+                  dropdownColor: isDark
+                      ? const Color(0xFF1E1C2A)
+                      : Colors.white,
+                  borderRadius: BorderRadius.circular(14),
+                  style: Theme.of(context).textTheme.bodyLarge
+                      ?.copyWith(color: textColor, fontSize: 15),
+                  decoration: InputDecoration(
+                    labelText: 'Plataforma',
+                    labelStyle: TextStyle(color: subtextColor),
+                    prefixIcon: const Icon(
+                      Icons.devices_outlined,
+                      color: Color(0xFF9B83FF),
+                    ),
+                    helperText: _plataformasDisponibles.isEmpty
+                        ? 'Agrega una plataforma en Configuración.'
+                        : 'Se usará en las nuevas sesiones.',
+                    helperMaxLines: 2,
+                    filled: true,
+                    fillColor: isDark
+                        ? const Color(0xFF1A1826)
+                        : Colors.grey.shade100,
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(14),
+                      borderSide: BorderSide(color: borderColor),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(14),
+                      borderSide: const BorderSide(
+                        color: Color(0xFF7C5CFF),
+                        width: 2,
+                      ),
+                    ),
+                  ),
+                  items: _plataformasDisponibles
+                      .map(
+                        (nombre) => DropdownMenuItem(
+                          value: nombre,
+                          child: Text(nombre, overflow: TextOverflow.ellipsis),
+                        ),
+                      )
+                      .toList(),
+                  onChanged: _guardando
+                      ? null
+                      : (value) =>
+                            setState(() => _plataformaSeleccionada = value),
                 ),
               ],
             ),

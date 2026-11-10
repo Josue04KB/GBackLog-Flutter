@@ -15,7 +15,7 @@ catálogo personal, agregar un videojuego y registrar una sesión de juego.
 - Registro e inicio de sesión.
 - Catálogo personal y exploración del catálogo global.
 - Configuración y consulta de plataformas maestras.
-- Registro y consulta de sesiones de juego.
+- Registro y consulta de sesiones de juego; pulsación prolongada para editar o eliminar.
 - Perfil de usuario, cambio de contraseña y cierre de sesión.
 
 ## Modelo de datos
@@ -42,6 +42,9 @@ Antes de una demostración se debe comprobar que las políticas RLS de Supabase
 permitan a cada usuario acceder únicamente a los registros que le corresponden.
 No se deben subir contraseñas, claves de servicio ni cuentas de demostración al
 repositorio.
+
+Para habilitar la edición y eliminación de sesiones, consulta la
+[guía de permisos de Supabase](supabase/README.md) y el SQL incluido allí.
 
 ## Arquitectura y herramientas
 

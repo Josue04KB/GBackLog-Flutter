@@ -1,7 +1,9 @@
 import 'package:flutter/foundation.dart';
+
 import '../../domain/models/game_models.dart';
 import '../../domain/repositories/game_repository.dart';
 import '../../domain/use_cases/registrar_sesion_use_case.dart';
+import '../../domain/use_cases/actualizar_sesion_use_case.dart';
 import '../widgets/ui_state.dart';
 
 class SessionViewModel extends ChangeNotifier {
@@ -46,6 +48,7 @@ class SessionViewModel extends ChangeNotifier {
     required String notas,
     int? filtroVideojuegoIdActual,
   }) async {
+    if (_isSubmitting) return false;
     _isSubmitting = true;
     _errorMessage = null;
     notifyListeners();
@@ -65,6 +68,45 @@ class SessionViewModel extends ChangeNotifier {
       _errorMessage = e.toString().replaceFirst('Exception: ', '');
       notifyListeners();
       return false;
+    }
+  }
+
+  Future<bool> editarSesion({
+    required int id,
+    required int? plataformaId,
+    required int minutosJugados,
+    required String notas,
+  }) => _modificarSesion(() async {
+    final updated = await ActualizarSesionUseCase(_repository).execute(
+      id: id,
+      plataformaId: plataformaId,
+      minutosJugados: minutosJugados,
+      notas: notas,
+    );
+    _sesiones = _sesiones.map((s) => s.id == id ? updated : s).toList();
+  });
+
+  Future<bool> eliminarSesion(int id) => _modificarSesion(() async {
+    await _repository.eliminarSesion(id);
+    _sesiones = _sesiones.where((s) => s.id != id).toList();
+  });
+
+  Future<bool> _modificarSesion(Future<void> Function() operation) async {
+    if (_isSubmitting) return false;
+    _isSubmitting = true;
+    _errorMessage = null;
+    notifyListeners();
+    try {
+      // La lista cambia únicamente tras la confirmación del servidor.
+      await operation();
+      _state = _sesiones.isEmpty ? ViewState.empty : ViewState.success;
+      return true;
+    } catch (e) {
+      _errorMessage = e.toString().replaceFirst('Exception: ', '');
+      return false;
+    } finally {
+      _isSubmitting = false;
+      notifyListeners();
     }
   }
 }

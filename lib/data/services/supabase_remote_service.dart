@@ -126,7 +126,16 @@ class SupabaseRemoteService {
 
   Future<void> updateVideojuego(int id, JsonMap data) async {
     try {
-      await _client.from('videojuegos').update(data).eq('id', id);
+      final updated = await _client
+          .from('videojuegos')
+          .update(data)
+          .eq('id', id)
+          .select('id');
+      if (updated.isEmpty) {
+        throw Exception(
+          'El juego ya no existe o no tienes permiso para editarlo.',
+        );
+      }
     } on SocketException {
       throw Exception('Sin conexión. No se pudo actualizar el videojuego.');
     } catch (e) {
@@ -160,6 +169,51 @@ class SupabaseRemoteService {
       throw Exception('Sin conexión. La sesión de juego no se pudo registrar.');
     } catch (e) {
       throw Exception('Error al registrar la transacción en el servidor: $e');
+    }
+  }
+
+  Future<JsonMap> updateSesion(int id, JsonMap data) async {
+    if (currentUser == null) throw Exception('Usuario no autenticado');
+    try {
+      final updated = await _client
+          .from('sesiones_juego')
+          .update(data)
+          .eq('id', id)
+          .select('*, videojuegos(titulo), plataformas(nombre)');
+      if (updated.isEmpty) {
+        throw Exception(
+          'La sesión ya no existe o no tienes permiso para editarla.',
+        );
+      }
+      return updated.single;
+    } on SocketException {
+      throw Exception('Sin conexión. No se pudo actualizar la sesión.');
+    } on PostgrestException {
+      throw Exception(
+        'No se pudo actualizar la sesión. Revisa los permisos de tu cuenta e intenta de nuevo.',
+      );
+    }
+  }
+
+  Future<void> deleteSesion(int id) async {
+    if (currentUser == null) throw Exception('Usuario no autenticado');
+    try {
+      final deleted = await _client
+          .from('sesiones_juego')
+          .delete()
+          .eq('id', id)
+          .select('id');
+      if (deleted.isEmpty) {
+        throw Exception(
+          'La sesión ya no existe o no tienes permiso para eliminarla.',
+        );
+      }
+    } on SocketException {
+      throw Exception('Sin conexión. No se pudo eliminar la sesión.');
+    } on PostgrestException {
+      throw Exception(
+        'No se pudo eliminar la sesión. Revisa los permisos de tu cuenta e intenta de nuevo.',
+      );
     }
   }
 

@@ -38,6 +38,60 @@ class _SessionRepository implements GameRepository {
   int? lastFilter;
   bool failInsert = false;
   Completer<void>? pendingInsert;
+  int updateCalls = 0;
+  int deleteCalls = 0;
+  bool failUpdate = false;
+  bool failDelete = false;
+  Completer<void>? pendingUpdate;
+  Completer<void>? pendingDelete;
+  String gamePlatform = 'PC';
+  int gameUpdateCalls = 0;
+  bool failGameUpdate = false;
+
+  @override
+  Future<void> actualizarVideojuego({
+    required int id,
+    required String titulo,
+    required String estado,
+    required String plataforma,
+    required String imagenUrl,
+  }) async {
+    gameUpdateCalls++;
+    if (failGameUpdate) throw Exception('No se pudo actualizar el juego.');
+    gamePlatform = plataforma;
+  }
+
+  @override
+  Future<SesionJuego> actualizarSesion({
+    required int id,
+    required int plataformaId,
+    required int minutosJugados,
+    required String notas,
+  }) async {
+    updateCalls++;
+    if (pendingUpdate != null) await pendingUpdate!.future;
+    if (failUpdate) {
+      throw Exception('No tienes permiso para editar esta sesión.');
+    }
+    final index = sesiones.indexWhere((s) => s.id == id);
+    final original = sesiones[index];
+    return sesiones[index] = SesionJuego(
+      id: original.id,
+      videojuegoId: original.videojuegoId,
+      plataformaId: plataformaId,
+      minutosJugados: minutosJugados,
+      notas: notas,
+      fecha: original.fecha,
+    );
+  }
+
+  @override
+  Future<void> eliminarSesion(int id) async {
+    deleteCalls++;
+    if (pendingDelete != null) await pendingDelete!.future;
+    if (failDelete) throw Exception('Sin conexión. No se pudo eliminar.');
+    sesiones.removeWhere((s) => s.id == id);
+  }
 
   @override
   Future<List<Videojuego>> getVideojuegos() async => [
@@ -46,7 +100,7 @@ class _SessionRepository implements GameRepository {
       titulo: 'Hades II',
       genero: 'Acción',
       estado: 'En progreso',
-      plataforma: 'PC',
+      plataforma: gamePlatform,
       imagenUrl: 'missing-test-cover.png',
     ),
   ];
@@ -104,6 +158,7 @@ Future<void> _openForm(
   _SessionRepository repository, {
   Brightness brightness = Brightness.dark,
   Size size = const Size(430, 932),
+  bool openForm = true,
 }) async {
   tester.view.physicalSize = size;
   tester.view.devicePixelRatio = 1;
@@ -141,7 +196,30 @@ Future<void> _openForm(
     ),
   );
   await tester.pumpAndSettle();
-  await tester.tap(find.text('Registrar sesión'));
+  if (openForm) {
+    await tester.tap(find.text('Registrar sesión'));
+    await tester.pumpAndSettle();
+  }
+}
+
+_SessionRepository _withSession() => _SessionRepository()
+  ..sesiones.add(
+    SesionJuego(
+      id: 17,
+      videojuegoId: 7,
+      plataformaId: 3,
+      minutosJugados: 60,
+      notas: 'Primera partida',
+      fecha: DateTime(2026, 11, 9, 19, 27),
+    ),
+  );
+
+Future<void> _chooseSessionAction(WidgetTester tester, String action) async {
+  await tester.longPress(find.byKey(const ValueKey('sesion-17')));
+  await tester.pumpAndSettle();
+  expect(find.text('Editar'), findsOneWidget);
+  expect(find.text('Eliminar'), findsOneWidget);
+  await tester.tap(find.text(action));
   await tester.pumpAndSettle();
 }
 
@@ -154,6 +232,22 @@ Future<void> _fillForm(WidgetTester tester) async {
     find.widgetWithText(TextFormField, 'Notas o progreso logrado'),
     '  Superé el primer jefe  ',
   );
+}
+
+Future<void> _editGame(WidgetTester tester) async {
+  await tester.tap(find.byType(PopupMenuButton<String>));
+  await tester.pumpAndSettle();
+  await tester.tap(find.text('Editar juego'));
+  await tester.pumpAndSettle();
+}
+
+Future<void> _selectGamePlatform(WidgetTester tester, String name) async {
+  final platform = find.byKey(const ValueKey('plataforma-juego'));
+  await tester.ensureVisible(platform);
+  await tester.tap(platform);
+  await tester.pumpAndSettle();
+  await tester.tap(find.text(name).last);
+  await tester.pumpAndSettle();
 }
 
 Finder get _save => find.ancestor(
@@ -181,6 +275,251 @@ void main() {
       await icons.load();
     }
   });
+
+  testWidgets(
+    'pulsación prolongada permite editar sin cambiar id, juego ni fecha',
+    (tester) async {
+      final repository = _withSession();
+      final original = repository.sesiones.single;
+      await _openForm(tester, repository, openForm: false);
+      await _chooseSessionAction(tester, 'Editar');
+      expect(find.text('Editar sesión'), findsOneWidget);
+      expect(find.text('60'), findsOneWidget);
+      expect(find.text('Primera partida'), findsWidgets);
+      expect(find.text('Plataforma'), findsNothing);
+      await _fillForm(tester);
+      await tester.ensureVisible(_save);
+      await tester.tap(_save);
+      await tester.pumpAndSettle();
+      final updated = repository.sesiones.single;
+      expect(updated.id, original.id);
+      expect(updated.videojuegoId, original.videojuegoId);
+      expect(updated.fecha, original.fecha);
+      expect(updated.plataformaId, original.plataformaId);
+      expect(updated.minutosJugados, 62);
+      expect(updated.notas, 'Superé el primer jefe');
+      expect(repository.insertCalls, 0);
+      expect(repository.updateCalls, 1);
+      expect(find.text('1h 2m'), findsOneWidget);
+      expect(find.text('62 minutos jugados'), findsOneWidget);
+      expect(find.text('Sesión actualizada'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'editar plataforma del juego actualiza la ficha y las nuevas sesiones, no el historial',
+    (tester) async {
+      final repository = _withSession();
+      await _openForm(tester, repository, openForm: false);
+      await _editGame(tester);
+      final platform = find.byKey(const ValueKey('plataforma-juego'));
+      await tester.ensureVisible(platform);
+      final status = find.widgetWithText(
+        DropdownButtonFormField<String>,
+        'Estado en tu colección',
+      );
+      expect(
+        tester.getTopLeft(platform).dy,
+        greaterThan(tester.getTopLeft(status).dy),
+      );
+      await _capturePreview(tester, 'edit-game-platform');
+      await _selectGamePlatform(tester, 'Switch');
+      await tester.tap(find.text('Guardar'));
+      await tester.pumpAndSettle();
+      expect(repository.gamePlatform, 'Switch');
+      expect(repository.gameUpdateCalls, 1);
+      expect(find.text('Switch'), findsOneWidget);
+      expect(repository.sesiones.single.plataformaId, 3);
+      await tester.tap(find.text('Registrar sesión'));
+      await tester.pumpAndSettle();
+      expect(find.text('Plataforma'), findsNothing);
+      await _fillForm(tester);
+      await tester.ensureVisible(_save);
+      await tester.tap(_save);
+      await tester.pumpAndSettle();
+      expect(repository.sesiones.last.plataformaId, 4);
+      await _chooseSessionAction(tester, 'Editar');
+      await _fillForm(tester);
+      await tester.ensureVisible(_save);
+      await tester.tap(_save);
+      await tester.pumpAndSettle();
+      expect(repository.sesiones.first.plataformaId, 3);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'cancelar o fallar al cambiar plataforma conserva el juego y permite reintentar',
+    (tester) async {
+      final repository = _SessionRepository();
+      await _openForm(tester, repository, openForm: false);
+      await _editGame(tester);
+      await _selectGamePlatform(tester, 'Switch');
+      await tester.tap(find.text('Cancelar'));
+      await tester.pumpAndSettle();
+      expect(repository.gameUpdateCalls, 0);
+      expect(find.text('PC'), findsOneWidget);
+      repository.failGameUpdate = true;
+      await _editGame(tester);
+      await _selectGamePlatform(tester, 'Switch');
+      await tester.tap(find.text('Guardar'));
+      await tester.pumpAndSettle();
+      expect(find.byType(EditGameScreen), findsOneWidget);
+      expect(repository.gamePlatform, 'PC');
+      expect(find.text('No se pudo actualizar el juego.'), findsOneWidget);
+      repository.failGameUpdate = false;
+      await tester.tap(find.text('Guardar'));
+      await tester.pumpAndSettle();
+      expect(repository.gamePlatform, 'Switch');
+      expect(find.byType(EditGameScreen), findsNothing);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'una plataforma no disponible obliga a elegirla en Editar juego',
+    (tester) async {
+      final repository = _SessionRepository()
+        ..gamePlatform = 'Plataforma eliminada';
+      await _openForm(tester, repository);
+      expect(find.byType(NewSessionSheet), findsNothing);
+      expect(
+        find.text(
+          'Selecciona una plataforma disponible en Editar juego antes de registrar una sesión.',
+        ),
+        findsOneWidget,
+      );
+      expect(repository.insertCalls, 0);
+      await _editGame(tester);
+      await tester.tap(find.text('Guardar'));
+      await tester.pumpAndSettle();
+      expect(repository.gameUpdateCalls, 0);
+      await _selectGamePlatform(tester, 'Switch');
+      await tester.tap(find.text('Guardar'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Registrar sesión'));
+      await tester.pumpAndSettle();
+      expect(find.byType(NewSessionSheet), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets('cancelar edición y borrado no modifica la sesión', (
+    tester,
+  ) async {
+    final repository = _withSession();
+    await _openForm(tester, repository, openForm: false);
+    await _chooseSessionAction(tester, 'Editar');
+    await _fillForm(tester);
+    await tester.ensureVisible(find.text('Cancelar'));
+    await tester.tap(find.text('Cancelar'));
+    await tester.pumpAndSettle();
+    await _chooseSessionAction(tester, 'Eliminar');
+    expect(find.text('¿Eliminar sesión?'), findsOneWidget);
+    await tester.tap(find.text('Cancelar'));
+    await tester.pumpAndSettle();
+    expect(repository.updateCalls, 0);
+    expect(repository.deleteCalls, 0);
+    expect(repository.sesiones.single.minutosJugados, 60);
+    expect(find.text('60 minutos jugados'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('editar conserva los cambios al fallar y bloquea doble envío', (
+    tester,
+  ) async {
+    final repository = _withSession()..failUpdate = true;
+    await _openForm(tester, repository, openForm: false);
+    await _chooseSessionAction(tester, 'Editar');
+    await _fillForm(tester);
+    await tester.ensureVisible(_save);
+    await tester.tap(_save);
+    await tester.pumpAndSettle();
+    expect(
+      find.text('No tienes permiso para editar esta sesión.'),
+      findsOneWidget,
+    );
+    expect(find.text('  Superé el primer jefe  '), findsOneWidget);
+    expect(repository.sesiones.single.minutosJugados, 60);
+    final pending = Completer<void>();
+    repository.failUpdate = false;
+    repository.pendingUpdate = pending;
+    await tester.ensureVisible(_save);
+    await tester.tap(_save);
+    await tester.tap(_save);
+    await tester.pump();
+    await tester.binding.handlePopRoute();
+    await tester.pump(const Duration(milliseconds: 100));
+    expect(find.byType(NewSessionSheet), findsOneWidget);
+    expect(repository.updateCalls, 2);
+    pending.complete();
+    await tester.pumpAndSettle();
+    expect(find.text('62 minutos jugados'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets(
+    'eliminar confirma, permite reintentar y actualiza el estado vacío',
+    (tester) async {
+      final repository = _withSession()..failDelete = true;
+      await _openForm(tester, repository, openForm: false);
+      await _chooseSessionAction(tester, 'Eliminar');
+      expect(repository.deleteCalls, 0);
+      await tester.tap(find.text('Eliminar sesión'));
+      await tester.pumpAndSettle();
+      expect(find.text('Sin conexión. No se pudo eliminar.'), findsOneWidget);
+      expect(repository.sesiones, hasLength(1));
+      final pending = Completer<void>();
+      repository.failDelete = false;
+      repository.pendingDelete = pending;
+      await tester.tap(find.text('Eliminar sesión'));
+      await tester.tap(find.text('Eliminar sesión'));
+      await tester.pump();
+      await tester.binding.handlePopRoute();
+      await tester.pump(const Duration(milliseconds: 100));
+      expect(find.text('Eliminando…'), findsOneWidget);
+      expect(repository.deleteCalls, 2);
+      pending.complete();
+      await tester.pumpAndSettle();
+      expect(repository.sesiones, isEmpty);
+      expect(
+        find.text('Aún no has registrado sesiones para este juego.'),
+        findsOneWidget,
+      );
+      expect(find.text('0 min'), findsOneWidget);
+      expect(find.text('0'), findsOneWidget);
+      expect(find.text('Sesión eliminada'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'eliminar una sesión mantiene las demás y descuenta solo sus minutos',
+    (tester) async {
+      final repository = _withSession()
+        ..sesiones.add(
+          SesionJuego(
+            id: 18,
+            videojuegoId: 7,
+            plataformaId: 4,
+            minutosJugados: 30,
+            notas: 'Segunda partida',
+            fecha: DateTime(2026, 11, 9),
+          ),
+        );
+      await _openForm(tester, repository, openForm: false);
+      expect(find.text('1h 30m'), findsOneWidget);
+      await _chooseSessionAction(tester, 'Eliminar');
+      await tester.tap(find.text('Eliminar sesión'));
+      await tester.pumpAndSettle();
+      expect(repository.sesiones.single.id, 18);
+      expect(find.text('30 min'), findsOneWidget);
+      expect(find.text('30 minutos jugados'), findsOneWidget);
+      expect(find.text('1'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    },
+  );
 
   testWidgets(
     'guardar una sesión con notas enfocadas no rompe el cierre del formulario',
@@ -280,9 +619,9 @@ void main() {
   );
 
   testWidgets(
-    'valida los campos y permite elegir minutos rápidos y plataforma',
+    'valida los campos y usa la plataforma del juego con minutos rápidos',
     (tester) async {
-      final repository = _SessionRepository();
+      final repository = _SessionRepository()..gamePlatform = 'Switch';
       await _openForm(tester, repository);
       await tester.ensureVisible(_save);
       await tester.tap(_save);
@@ -296,12 +635,7 @@ void main() {
         find.text('Describe tu avance con al menos 5 caracteres.'),
         findsOneWidget,
       );
-      final platform = find.byType(DropdownButtonFormField<int>);
-      await tester.ensureVisible(platform);
-      await tester.tap(platform);
-      await tester.pumpAndSettle();
-      await tester.tap(find.text('Switch').last);
-      await tester.pumpAndSettle();
+      expect(find.text('Plataforma'), findsNothing);
       await tester.ensureVisible(find.text('30 min'));
       await tester.tap(find.text('30 min'));
       await tester.enterText(
@@ -363,8 +697,6 @@ void main() {
               child: NewSessionSheet(
                 videojuegoTitulo:
                     'Un videojuego con un nombre especialmente largo',
-                plataformas: await _SessionRepository().getPlataformas(),
-                plataformaInicialId: 3,
                 onSave: (_) async => 'Error de prueba',
               ),
             ),

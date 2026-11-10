@@ -102,11 +102,13 @@ class GameRepositoryImpl implements GameRepository {
     required int id,
     required String titulo,
     required String estado,
+    required String plataforma,
     required String imagenUrl,
   }) async {
     await _remoteService.updateVideojuego(id, {
       'titulo': titulo.trim(),
       'estado': estado,
+      'plataforma': plataforma.trim(),
       'imagen_url': imagenUrl.trim().isEmpty ? null : imagenUrl.trim(),
     });
   }
@@ -138,6 +140,24 @@ class GameRepositoryImpl implements GameRepository {
       'notas': notas,
     });
   }
+
+  @override
+  Future<SesionJuego> actualizarSesion({
+    required int id,
+    required int plataformaId,
+    required int minutosJugados,
+    required String notas,
+  }) async {
+    final updated = await _remoteService.updateSesion(id, {
+      'plataforma_id': plataformaId,
+      'minutos_jugados': minutosJugados,
+      'notas': notas.trim(),
+    });
+    return SesionJuego.fromJson(updated);
+  }
+
+  @override
+  Future<void> eliminarSesion(int id) => _remoteService.deleteSesion(id);
 
   @override
   Future<void> actualizarContrasena(String nuevaContrasena) async {

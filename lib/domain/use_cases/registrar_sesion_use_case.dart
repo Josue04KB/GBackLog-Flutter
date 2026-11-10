@@ -1,4 +1,5 @@
 import '../repositories/game_repository.dart';
+import 'validar_sesion.dart';
 
 class RegistrarSesionUseCase {
   final GameRepository _repository;
@@ -16,16 +17,12 @@ class RegistrarSesionUseCase {
       throw Exception('Debes seleccionar un videojuego y una plataforma.');
     }
 
-    // Regla 2: Validación de rango lógico de tiempo (1 min a 24 horas)
-    if (minutosJugados <= 0 || minutosJugados > 1440) {
-      throw Exception('El tiempo jugado debe estar entre 1 y 1440 minutos.');
-    }
-
-    // Regla 3: Validación de contenido mínimo en notas de partida
+    validarSesion(
+      plataformaId: plataformaId,
+      minutosJugados: minutosJugados,
+      notas: notas,
+    );
     final notasLimpias = notas.trim();
-    if (notasLimpias.length < 5) {
-      throw Exception('Las notas deben tener al menos 5 caracteres.');
-    }
 
     // Si pasa todas las reglas de dominio, se envía al repositorio
     await _repository.registrarSesion(

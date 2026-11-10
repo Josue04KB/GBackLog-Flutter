@@ -4,13 +4,8 @@ import 'package:flutter/services.dart';
 import '../../domain/models/game_models.dart';
 
 class SessionDraft {
-  const SessionDraft({
-    required this.plataformaId,
-    required this.minutosJugados,
-    required this.notas,
-  });
+  const SessionDraft({required this.minutosJugados, required this.notas});
 
-  final int plataformaId;
   final int minutosJugados;
   final String notas;
 }
@@ -21,14 +16,12 @@ class NewSessionSheet extends StatefulWidget {
   const NewSessionSheet({
     super.key,
     required this.videojuegoTitulo,
-    required this.plataformas,
-    required this.plataformaInicialId,
     required this.onSave,
+    this.sesionInicial,
   });
 
   final String videojuegoTitulo;
-  final List<Plataforma> plataformas;
-  final int? plataformaInicialId;
+  final SesionJuego? sesionInicial;
 
   /// Devuelve null al guardar o el mensaje de error para permitir reintentar.
   final Future<String?> Function(SessionDraft draft) onSave;
@@ -42,19 +35,17 @@ class _NewSessionSheetState extends State<NewSessionSheet> {
   final _formKey = GlobalKey<FormState>();
   final _minutesController = TextEditingController();
   final _notesController = TextEditingController();
-  int? _platformId;
   bool _saving = false;
   String? _error;
 
   @override
   void initState() {
     super.initState();
-    _platformId =
-        widget.plataformas.any(
-          (platform) => platform.id == widget.plataformaInicialId,
-        )
-        ? widget.plataformaInicialId
-        : null;
+    final initial = widget.sesionInicial;
+    if (initial != null) {
+      _minutesController.text = initial.minutosJugados.toString();
+      _notesController.text = initial.notas;
+    }
   }
 
   @override
@@ -68,7 +59,6 @@ class _NewSessionSheetState extends State<NewSessionSheet> {
     if (_saving || !(_formKey.currentState?.validate() ?? false)) return;
 
     final draft = SessionDraft(
-      plataformaId: _platformId!,
       minutosJugados: int.parse(_minutesController.text.trim()),
       notas: _notesController.text.trim(),
     );
@@ -190,7 +180,9 @@ class _NewSessionSheetState extends State<NewSessionSheet> {
                         const SizedBox(width: 12),
                         Expanded(
                           child: Text(
-                            'Nueva sesión',
+                            widget.sesionInicial == null
+                                ? 'Nueva sesión'
+                                : 'Editar sesión',
                             style: TextStyle(
                               color: foreground,
                               fontSize: 23,
@@ -209,7 +201,9 @@ class _NewSessionSheetState extends State<NewSessionSheet> {
                     ),
                     const SizedBox(height: 12),
                     Text(
-                      'Guarda tu tiempo y los avances de tu partida.',
+                      widget.sesionInicial == null
+                          ? 'Guarda tu tiempo y los avances de tu partida.'
+                          : 'Actualiza tu partida. Se conservará la fecha original.',
                       style: TextStyle(
                         color: secondary,
                         fontSize: 14,
@@ -243,35 +237,6 @@ class _NewSessionSheetState extends State<NewSessionSheet> {
                       ),
                     ),
                     const SizedBox(height: 24),
-                    DropdownButtonFormField<int>(
-                      initialValue: _platformId,
-                      isExpanded: true,
-                      dropdownColor: fieldBackground,
-                      borderRadius: BorderRadius.circular(14),
-                      style: Theme.of(context).textTheme.bodyLarge
-                          ?.copyWith(color: foreground, fontSize: 15),
-                      decoration: decoration(
-                        'Plataforma',
-                        icon: Icons.devices_outlined,
-                      ),
-                      items: widget.plataformas
-                          .map(
-                            (platform) => DropdownMenuItem(
-                              value: platform.id,
-                              child: Text(
-                                platform.nombre,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ),
-                          )
-                          .toList(),
-                      onChanged: _saving
-                          ? null
-                          : (value) => setState(() => _platformId = value),
-                      validator: (value) =>
-                          value == null ? 'Selecciona una plataforma.' : null,
-                    ),
-                    const SizedBox(height: 20),
                     TextFormField(
                       controller: _minutesController,
                       enabled: !_saving,
@@ -387,7 +352,11 @@ class _NewSessionSheetState extends State<NewSessionSheet> {
                             )
                           : const Icon(Icons.check_rounded, size: 21),
                       label: Text(
-                        _saving ? 'Guardando sesión…' : 'Guardar sesión',
+                        _saving
+                            ? 'Guardando sesión…'
+                            : widget.sesionInicial == null
+                            ? 'Guardar sesión'
+                            : 'Guardar cambios',
                         style: const TextStyle(
                           fontWeight: FontWeight.w700,
                           fontSize: 16,

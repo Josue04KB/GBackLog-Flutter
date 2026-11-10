@@ -113,6 +113,7 @@ class CatalogViewModel extends ChangeNotifier {
     required int id,
     required String nuevoTitulo,
     required String nuevoEstado,
+    required String nuevaPlataforma,
     required String nuevaImagenUrl,
   }) async {
     _errorMessage = null;
@@ -123,6 +124,7 @@ class CatalogViewModel extends ChangeNotifier {
         id: id,
         titulo: nuevoTitulo,
         estado: nuevoEstado,
+        plataforma: nuevaPlataforma,
         imagenUrl: nuevaImagenUrl,
       );
 
@@ -134,7 +136,7 @@ class CatalogViewModel extends ChangeNotifier {
           titulo: nuevoTitulo,
           genero: actual.genero,
           estado: nuevoEstado,
-          plataforma: actual.plataforma,
+          plataforma: nuevaPlataforma,
           imagenUrl: nuevaImagenUrl.isEmpty ? null : nuevaImagenUrl,
         );
       }
